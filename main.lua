@@ -70,6 +70,8 @@ function love.update(dt)
     local isHeightPlusDown = love.keyboard.isDown("z")
     local isHeightMinusDown = love.keyboard.isDown("s")
 
+    local isEscapeDown = love.keyboard.isDown("escape")
+
     if isRDown and not isRKeyDown then
         isRKeyDown = true
         seed = os.time()
@@ -119,6 +121,10 @@ function love.update(dt)
         isHeightMinusKeyDown = true
         mapHeight = mapHeight - 1
         runGeneration()
+    end
+
+    if isEscapeDown then
+        love.event.push("quit")
     end
 
     isRKeyDown = isRDown
