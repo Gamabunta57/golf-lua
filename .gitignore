@@ -1,0 +1,10 @@
+# MacOS
+.DS_Store
+__MACOSX/
+
+# IDE
+.vscode
+
+# local dev
+build.bat
+game.love
