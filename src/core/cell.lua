@@ -7,9 +7,14 @@ Cell = {
     CELL_WALL_BOTTOM = 0x02,
     CELL_WALL_ALL = 0x03, -- CELL_WALL_RIGHT | CELL_WALL_BOTTOM
 
+    CELL_SURROUNDING_WALLS = 0x04, -- Should pick something else but matches the tileset
+
+    CELL_ELEVATOR = 0x08,
+
     -- minus numbers to block path
     CELL_WALL_BLOCKED = -2,
     CELL_UNWALKED = -1,
+
 }
 Cell.__index = Cell
 

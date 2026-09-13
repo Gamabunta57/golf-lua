@@ -39,13 +39,15 @@ end
 ---@private
 function Map.getCharacter(walls)
     if walls == Cell.CELL_WALL_ALL then
-        return "/"
+        return "."
     elseif walls == Cell.CELL_WALL_RIGHT then
         return "|"
     elseif walls == Cell.CELL_WALL_BOTTOM then
         return "_"
     elseif walls == Cell.CELL_WALL_NONE then
         return " "
+    elseif walls == Cell.CELL_ELEVATOR then
+        return "E"
     else
         return "?"
     end

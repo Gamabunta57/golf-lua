@@ -1,6 +1,6 @@
 require("src/core/prng")
 require("src/core/map")
-require("src/generator/mapGenerator")
+require("src/generator/mapGeneratorCorridorsAndRooms")
 
 local seed = os.time()
 ---@type Map
@@ -8,6 +8,8 @@ local map = nil
 local tileset = nil
 local quadSet = nil
 local tilesetCellSize = 16
+local elevatorCellPadding = 2
+local elevatorCellScale = (tilesetCellSize - elevatorCellPadding * 2) / tilesetCellSize
 
 ---@type MapGenerator
 local generator = nil
@@ -33,10 +35,10 @@ local mapMinSize = 3 -- 1 cell + 2 for borders
 ---run a map generation
 local function runGeneration()
     local rand = Prng:new(seed)
-    map = Map:new(mapWidth, mapHeight, 1)
-    generator = MapGenerator:new(rand, map, {shouldCarveRoom = shouldCarveRoom, roomThreshold = carveRoomThreshold})
+    map = Map:new(mapWidth, mapHeight, 4)
+    generator = MapGenerator:new(rand, map, {shouldCarveRoom = shouldCarveRoom, roomThreshold = carveRoomThreshold, corridorsStep = 12})
     generator:generate()
-    print(map)
+    -- print(map)
 end
 
 function love.load()
@@ -165,27 +167,38 @@ function love.draw()
     end
 
     local i = 1
-    --for z=1, map.depth do
+    for z=1, map.depth do
         for y=1, map.height do
-            local posY = originY + ((y - 1) * tileSizePx) -- + ((z - 1) * tileSizePx * map.height)
+            local posY = originY + ((y - 1) * tileSizePx) + ((z - 1) * tileSizePx * map.height)
             for x=1, map.width do
                 local posX = originX + ((x - 1) * tileSizePx)
                 local mapCellReference = map.mapData[i].walls
                 local mapIndex = map.mapData[i].index
 
-                if mapCellReference == 9 then
-                    mapCellReference = 4
-                end
-
                 local cell = quadSet[mapCellReference + 1]
-                love.graphics.draw(tileset, cell, posX, posY)
+
+                if mapIndex == Cell.CELL_UNWALKED then
+                    love.graphics.setColor(.5, .5, .5, 1)
+                    love.graphics.draw(tileset, quadSet[1], posX, posY)
+                    love.graphics.setColor(1, 1, 1, 1)
+                else
+                    love.graphics.draw(tileset, cell, posX, posY)
+                end
+                
+                if mapIndex == Cell.CELL_ELEVATOR then
+                    love.graphics.setColor(.5, .125, .25, 1)
+                    love.graphics.draw(tileset, quadSet[1], posX + 1, posY + 1, 0, elevatorCellScale)
+                    love.graphics.setColor(1, 1, 1, 1)
+                end
+                
                 if shouldDisplayIndices then
                     love.graphics.setColor(0, 0, 0, 1)
                     love.graphics.print(mapIndex, posX, posY)
                     love.graphics.setColor(1, 1, 1, 1)
                 end
+
                 i = i + 1
             end
         end
-    --end
+    end
 end

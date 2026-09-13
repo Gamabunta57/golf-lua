@@ -11,6 +11,7 @@ MapGenerator.__index = MapGenerator
 local defaultOptions = {
     roomThreshold = 10,
     shouldCarveRoom = true,
+    corridorsStep = 12
 }
 
 ---@ctor
@@ -50,8 +51,8 @@ function MapGenerator:initialiseMap()
             local index = floorBaseIndex + y * width
             self.map.mapData[index + 1].index = Cell.CELL_WALL_BLOCKED
             self.map.mapData[index + width].index = Cell.CELL_WALL_BLOCKED
-            self.map.mapData[index + 1].walls = 9
-            self.map.mapData[index + width].walls = 9
+            self.map.mapData[index + 1].walls = Cell.CELL_SURROUNDING_WALLS
+            self.map.mapData[index + width].walls = Cell.CELL_SURROUNDING_WALLS
         end
 
         -- setting top and bottom walls
@@ -59,8 +60,8 @@ function MapGenerator:initialiseMap()
             local index = floorBaseIndex + x
             self.map.mapData[index].index = Cell.CELL_WALL_BLOCKED
             self.map.mapData[index + lastTileRowStartIndex].index = Cell.CELL_WALL_BLOCKED
-            self.map.mapData[index].walls = 9
-            self.map.mapData[index + lastTileRowStartIndex].walls = 9
+            self.map.mapData[index].walls = Cell.CELL_SURROUNDING_WALLS
+            self.map.mapData[index + lastTileRowStartIndex].walls = Cell.CELL_SURROUNDING_WALLS
         end
     end
 end
@@ -162,28 +163,26 @@ function MapGenerator:generateMaze()
         if #availableDirections == 0 then
             currentStackIndex = currentStackIndex - 1
             self:markCellAsBrowsed(currentMapIndex, tileWalkedCount)
-            goto continue
+        else
+            local directionIndex = self.prng:next(1, #availableDirections)
+            local nextIndex = availableDirections[directionIndex]
+            currentStackIndex = currentStackIndex + 1
+            indicesStack[currentStackIndex] = nextIndex[1]
+
+            if (nextIndex[2] == "top") then
+                self:removeWall(nextIndex[1], Cell.CELL_WALL_BOTTOM)
+            elseif nextIndex[2] == "right" then
+                self:removeWall(currentMapIndex, Cell.CELL_WALL_RIGHT)
+            elseif nextIndex[2] == "bottom" then
+                self:removeWall(currentMapIndex, Cell.CELL_WALL_BOTTOM)
+            elseif nextIndex[2] == "left" then
+                self:removeWall(nextIndex[1], Cell.CELL_WALL_RIGHT)
+            end
+
+            self:markCellAsBrowsed(currentMapIndex, tileWalkedCount)
+            tileWalkedCount = tileWalkedCount + 1
+
         end
-
-        local directionIndex = self.prng:next(1, #availableDirections)
-        local nextIndex = availableDirections[directionIndex]
-        currentStackIndex = currentStackIndex + 1
-        indicesStack[currentStackIndex] = nextIndex[1]
-
-        if (nextIndex[2] == "top") then
-            self:removeWall(nextIndex[1], Cell.CELL_WALL_BOTTOM)
-        elseif nextIndex[2] == "right" then
-            self:removeWall(currentMapIndex, Cell.CELL_WALL_RIGHT)
-        elseif nextIndex[2] == "bottom" then
-            self:removeWall(currentMapIndex, Cell.CELL_WALL_BOTTOM)
-        elseif nextIndex[2] == "left" then
-            self:removeWall(nextIndex[1], Cell.CELL_WALL_RIGHT)
-        end
-
-        self:markCellAsBrowsed(currentMapIndex, tileWalkedCount)
-        tileWalkedCount = tileWalkedCount + 1
-
-        ::continue::
     end
 
     self:cleanMapBorder()
@@ -198,26 +197,25 @@ function MapGenerator:carveRooms()
     for i = 1, #self.map.mapData do
         local cell = self.map.mapData[i]
 
-        if cell.index == -2 then goto continue end
+        if not cell.index == -2 then
 
-        local rightCell = self.map.mapData[i + rightCellOffset]
-        local bottomCell = self.map.mapData[i + bottomCellOffset]
+            local rightCell = self.map.mapData[i + rightCellOffset]
+            local bottomCell = self.map.mapData[i + bottomCellOffset]
 
-        if rightCell.index >= 0 then
-            local diff = math.abs(rightCell.index - cell.index)
-            if diff > 2 and diff <= roomThreshold then
-                self:removeWall(i, Cell.CELL_WALL_RIGHT)
+            if rightCell.index >= 0 then
+                local diff = math.abs(rightCell.index - cell.index)
+                if diff > 2 and diff <= roomThreshold then
+                    self:removeWall(i, Cell.CELL_WALL_RIGHT)
+                end
+            end
+
+            if bottomCell.index >= 0 then
+                local diff = math.abs(bottomCell.index - cell.index)
+                if diff > 2 and diff <= roomThreshold then
+                    self:removeWall(i, Cell.CELL_WALL_BOTTOM)
+                end
             end
         end
-
-        if bottomCell.index >= 0 then
-            local diff = math.abs(bottomCell.index - cell.index)
-            if diff > 2 and diff <= roomThreshold then
-                self:removeWall(i, Cell.CELL_WALL_BOTTOM)
-            end
-        end
-
-        ::continue::
     end
 end
 
