@@ -1,10 +1,11 @@
-local Cell = {}
-Cell.__index = Cell
+Cell = {
+    LIMIT = 1,
+    UNDEFINED = 2,
+    ELEVATOR = 3,
+    CORRIDOR = 4,
+}
 
-Cell.LIMIT = 1
-Cell.UNDEFINED = 2
-Cell.ELEVATOR = 3
-Cell.CORRIDOR = 4
+Cell.__index = Cell
 
 function Cell:new()
     local o = {
@@ -14,5 +15,3 @@ function Cell:new()
     self.__index = self
     return o
 end
-
-return Cell

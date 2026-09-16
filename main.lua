@@ -1,5 +1,5 @@
-local Map = require("src/data/map")
-local Generator = require("src/generators/generator")
+require("src/data/map")
+require("src/generators/generator")
 
 local seed = os.time()
 

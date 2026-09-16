@@ -1,6 +1,6 @@
-local Cell = require("src/data/cell")
+require("src/data/cell")
 
-local Map = {}
+Map = {}
 Map.__index = Map
 
 function Map:new(width, height, depth)
@@ -28,5 +28,3 @@ function Map:_initMap()
         self.floorCells[z] = currentFlooCells
     end
 end
-
-return Map

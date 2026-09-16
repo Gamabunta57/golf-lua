@@ -1,8 +1,9 @@
-local Cell = require("src/data/cell")
+require("src/data/cell")
 
-local Generator = {}
+Generator = {
+    CORRIDOR_RATIO = .12,
+}
 Generator.__index = Generator
-Generator.CORRIDOR_RATIO = .12
 
 function Generator:new(map, prng)
     local o = {
@@ -138,5 +139,3 @@ function Generator:_placeElevator()
 
     return nextRowCell
 end
-
-return Generator
