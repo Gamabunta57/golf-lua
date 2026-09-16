@@ -3,7 +3,7 @@ require("src/generators/generator")
 
 local seed = os.time()
 
-local CELL_SIZE = 6
+local CELL_SIZE = 18
 local map = nil
 local tileSet = nil
 local generator = nil
@@ -23,7 +23,7 @@ local wasZPressed = false
 local wasSPressed = false
 
 function regenerateMap()
-    map = Map:new(16, 16, 6)
+    map = Map:new(15, 15, 1)
     love.math.setRandomSeed(seed)
     generator = Generator:new(map, prng)
     generator:generateMap(maxStepCount)

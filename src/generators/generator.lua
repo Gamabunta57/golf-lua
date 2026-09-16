@@ -17,7 +17,8 @@ end
 
 function Generator:generateMap(maxStepCount)
     self:_initialise()
-    self:_buildCorridors(maxStepCount)
+    -- self:_buildCorridors(maxStepCount)
+    self:_buildFakeCorridors(maxStepCount)
 end
 
 function Generator:_initialise()
@@ -79,6 +80,24 @@ function Generator:_buildCorridors(maxStepCount)
             stepCount = stepCount + 1
         end
     end    
+end
+
+function Generator:_buildFakeCorridors(maxStepCount)
+    -- force elevator to the center
+    local width = self.map.width
+    local height = self.map.height
+
+    local centerIndex = math.ceil(width * height / 2)
+    local corridorIndex = centerIndex + width
+
+    self.map.floorCells[1][centerIndex].tileRef = Cell.ELEVATOR
+    self.map.floorCells[1][corridorIndex].tileRef = Cell.CORRIDOR
+
+    local distanceToCarveCorridor = (width / 2) - 3
+    for i = 1, distanceToCarveCorridor do
+        self.map.floorCells[1][corridorIndex + i].tileRef = Cell.CORRIDOR
+        self.map.floorCells[1][corridorIndex - i].tileRef = Cell.CORRIDOR
+    end
 end
 
 function Generator:_getMaxDistanceFromCellInDirection(floorCells, cellIndex, stepInDirection)
