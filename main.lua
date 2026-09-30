@@ -17,10 +17,15 @@ local colors = {
     {.5, .5, .5, 1}, -- Cell.UNDEFINED
     {.75, .25, .5, 1}, -- Cell.ELEVATOR
     {1, 1, 1, 1}, -- Cell.CORRIDOR
+    {.5, .75, .25, 1}, -- Cell.hasAnchor // 1
+    {.25, 1, .15, 1}, -- Cell.hasAnchor // 2
+    {.15, 1, 1, 1}, -- Cell.hasAnchor // 3
+    {1, 1, 0, 1}, -- Cell.hasAnchor // 4
 }
 
 local wasZPressed = false
 local wasSPressed = false
+local wasRPressed = false
 
 function regenerateMap()
     map = Map:new(15, 15, 1)
@@ -44,6 +49,7 @@ end
 function love.update(dt)
     local isZPressed = love.keyboard.isDown("z")
     local isSPressed = love.keyboard.isDown("s")
+    local isRPressed = love.keyboard.isDown("r")
     if isZPressed and not wasZPressed then
         maxStepCount = maxStepCount + 1
         regenerateMap()
@@ -54,8 +60,14 @@ function love.update(dt)
         regenerateMap()
     end
 
+    if isRPressed and not wasRPressed then
+        seed = os.time()
+        regenerateMap()
+    end
+
     wasZPressed = isZPressed
     wasSPressed = isSPressed
+    wasRPressed = isRPressed
 end
 
 function love.draw()
@@ -72,7 +84,18 @@ function love.draw()
                 i = i + 1
 
                 local cell = map.floorCells[z][i]
-                love.graphics.setColor(colors[cell.tileRef])
+                local anchorCount = cell:anchorCount()
+                if anchorCount == 1 then
+                    love.graphics.setColor(colors[5])
+                elseif anchorCount == 2 then
+                    love.graphics.setColor(colors[6])
+                elseif anchorCount == 3 then
+                    love.graphics.setColor(colors[7])
+                elseif anchorCount == 4 then
+                    love.graphics.setColor(colors[8])
+                else
+                    love.graphics.setColor(colors[cell.tileRef])
+                end
                 love.graphics.draw(tileSet, quads[1], origX + xOffset, origY + yOffset)
             end
         end
