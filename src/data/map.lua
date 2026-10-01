@@ -8,7 +8,8 @@ function Map:new(width, height, depth)
         width = width or 1,
         height = height or 1,
         depth = depth or 1,
-        floorCells = {}
+        floorCells = {},
+        floorRooms = {},
     }
 
     setmetatable(o, self)
@@ -26,5 +27,6 @@ function Map:_initMap()
             currentFlooCells[xy] = Cell:new()
         end
         self.floorCells[z] = currentFlooCells
+        self.floorRooms[z] = {}
     end
 end

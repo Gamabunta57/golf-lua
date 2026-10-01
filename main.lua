@@ -14,13 +14,36 @@ local maxStepCount = 5
 
 local colors = {
     {0, 0, 0, 1}, -- Cell.LIMIT
-    {.5, .5, .5, 1}, -- Cell.UNDEFINED
-    {.75, .25, .5, 1}, -- Cell.ELEVATOR
+    {1, 0, 1, 1}, -- Cell.UNDEFINED
+    {1, .5, .25, 1}, -- Cell.ELEVATOR
     {1, 1, 1, 1}, -- Cell.CORRIDOR
+    {1, 0, 1, 1}, -- Cell.ROOM
     {.5, .75, .25, 1}, -- Cell.hasAnchor // 1
     {.25, 1, .15, 1}, -- Cell.hasAnchor // 2
     {.15, 1, 1, 1}, -- Cell.hasAnchor // 3
     {1, 1, 0, 1}, -- Cell.hasAnchor // 4
+}
+
+local roomColors = {
+    {0, 0, .25, .3},
+    {0, .25, 0, .3},
+    {.25, 0, 0, .3},
+    {.25, .25, 0, .3},
+
+    {0, 0, .5, .3},
+    {0, .5, 0, .3},
+    {.75, 0, 0, .3},
+    {.5, .5, 0, .3},
+
+    {0, 0, .75, .3},
+    {0, .75, 0, .3},
+    {.5, 0, 0, .3},
+    {.75, .75, 0, .3},
+
+    {0, 0, 1, .3},
+    {0, 1, 0, .3},
+    {1, 0, 0, .3},
+    {1, .25, .15, .3},
 }
 
 local wasZPressed = false
@@ -28,14 +51,14 @@ local wasSPressed = false
 local wasRPressed = false
 
 function regenerateMap()
-    map = Map:new(15, 15, 1)
+    map = Map:new(15, 15, 3)
     love.math.setRandomSeed(seed)
     generator = Generator:new(map, prng)
     generator:generateMap(maxStepCount)
 end
 
 function love.load()
-    love.graphics.setBackgroundColor(.25, .25, .75, 1)
+    love.graphics.setBackgroundColor(.15, .15, .15, 1)
     tileSet = love.graphics.newImage("assets/images/tileset.png")
     quads[1] = love.graphics.newQuad(0, 0, CELL_SIZE, CELL_SIZE, 0, 0)
 
@@ -85,14 +108,16 @@ function love.draw()
 
                 local cell = map.floorCells[z][i]
                 local anchorCount = cell:anchorCount()
-                if anchorCount == 1 then
-                    love.graphics.setColor(colors[5])
-                elseif anchorCount == 2 then
+                if cell.tileRef == Cell.ROOM then
+                    love.graphics.setColor(roomColors[(cell.roomIndex % #roomColors) + 1])
+                elseif anchorCount == 1 then
                     love.graphics.setColor(colors[6])
-                elseif anchorCount == 3 then
+                elseif anchorCount == 2 then
                     love.graphics.setColor(colors[7])
-                elseif anchorCount == 4 then
+                elseif anchorCount == 3 then
                     love.graphics.setColor(colors[8])
+                elseif anchorCount == 4 then
+                    love.graphics.setColor(colors[9])
                 else
                     love.graphics.setColor(colors[cell.tileRef])
                 end

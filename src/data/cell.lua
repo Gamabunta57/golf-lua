@@ -3,6 +3,7 @@ Cell = {
     UNDEFINED = 2,
     ELEVATOR = 3,
     CORRIDOR = 4,
+    ROOM = 5,
 }
 
 Cell.__index = Cell
@@ -10,16 +11,21 @@ Cell.__index = Cell
 function Cell:new()
     local o = {
         tileRef = Cell.UNDEFINED,
-        anchor = {
-            toTop = false,
-            toRight = false,
-            toBottom = false,
-            toLeft = false,
-        },
+        roomIndex = 0,
+        anchor = Cell.getEmptyAnchors(),
     }
     setmetatable(o, self)
     self.__index = self
     return o
+end
+
+function Cell.getEmptyAnchors()
+    return {
+        toTop = false,
+        toRight = false,
+        toBottom = false,
+        toLeft = false,
+    }
 end
 
 function Cell:hasAnchor()
