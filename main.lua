@@ -51,7 +51,7 @@ local wasSPressed = false
 local wasRPressed = false
 
 function regenerateMap()
-    map = Map:new(15, 15, 3)
+    map = Map:new(15, 15, 6)
     love.math.setRandomSeed(seed)
     generator = Generator:new(map, prng)
     generator:generateMap(maxStepCount)
@@ -95,34 +95,64 @@ end
 
 function love.draw()
     local floorHeightPx = map.height * CELL_SIZE
-    local origX = love.graphics.getWidth() / 2 - (map.width * CELL_SIZE / 2)
-    local origY = love.graphics.getHeight() / 2 - (floorHeightPx * map.depth / 2)
+    local floorWidthPx = map.width * CELL_SIZE
+
+    local width, height = love.graphics.getDimensions()
+
+    local maxFloorDisplayOn1Column = math.floor(height / floorHeightPx)
+    local columnCountToDisplay = math.ceil(map.depth / maxFloorDisplayOn1Column)
+
+    local columnHeightPx = floorHeightPx * maxFloorDisplayOn1Column
+
+    local origX = width / 2 - (columnCountToDisplay * floorWidthPx / 2)
+    local origY = height / 2 - (columnHeightPx / 2)
+
+    local currentOriginX = origX
+    local currentOriginY = origY
+
+    local floorDisplayedInColumn = 0
 
     for z = 1, map.depth do
-        local i = 0
-        for y = 0, (map.height - 1) do
-            local yOffset = y * CELL_SIZE + floorHeightPx * (z - 1)
-            for x = 0, (map.width - 1) do
-                local xOffset = x * CELL_SIZE
-                i = i + 1
 
-                local cell = map.floorCells[z][i]
-                local anchorCount = cell:anchorCount()
-                if cell.tileRef == Cell.ROOM then
-                    love.graphics.setColor(roomColors[(cell.roomIndex % #roomColors) + 1])
-                elseif anchorCount == 1 then
-                    love.graphics.setColor(colors[6])
-                elseif anchorCount == 2 then
-                    love.graphics.setColor(colors[7])
-                elseif anchorCount == 3 then
-                    love.graphics.setColor(colors[8])
-                elseif anchorCount == 4 then
-                    love.graphics.setColor(colors[9])
-                else
-                    love.graphics.setColor(colors[cell.tileRef])
-                end
-                love.graphics.draw(tileSet, quads[1], origX + xOffset, origY + yOffset)
+        local floorCells = map.floorCells[z];
+
+        displayFloor(floorCells, map.width, map.height, currentOriginX, currentOriginY)
+        
+        floorDisplayedInColumn = floorDisplayedInColumn + 1
+        currentOriginY = currentOriginY + floorHeightPx
+
+        if (floorDisplayedInColumn >= maxFloorDisplayOn1Column) then
+            floorDisplayedInColumn = 0
+            currentOriginX = currentOriginX + floorWidthPx
+            currentOriginY = origY
+        end
+    end
+end
+
+function displayFloor(floorCells, width, height, origX, origY)
+    local i = 0
+    for y = 0, (height - 1) do
+        local yOffset = y * CELL_SIZE + origY
+        for x = 0, (width - 1) do
+            local xOffset = x * CELL_SIZE + origX
+            i = i + 1
+
+            local cell = floorCells[i]
+            local anchorCount = cell:anchorCount()
+            if cell.tileRef == Cell.ROOM then
+                love.graphics.setColor(roomColors[(cell.roomIndex % #roomColors) + 1])
+            elseif anchorCount == 1 then
+                love.graphics.setColor(colors[6])
+            elseif anchorCount == 2 then
+                love.graphics.setColor(colors[7])
+            elseif anchorCount == 3 then
+                love.graphics.setColor(colors[8])
+            elseif anchorCount == 4 then
+                love.graphics.setColor(colors[9])
+            else
+                love.graphics.setColor(colors[cell.tileRef])
             end
+            love.graphics.draw(tileSet, quads[1], xOffset, yOffset)
         end
     end
 end

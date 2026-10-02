@@ -1,4 +1,5 @@
 require("src/data/cell")
+require("src/data/rectangleRoom")
 
 Anchors = {
     TO_TOP = 1,
@@ -27,7 +28,125 @@ function Generator:generateMap(maxStepCount)
     self:_buildCorridors(maxStepCount)
     -- self:_buildFakeCorridors(maxStepCount)
     local anchorsLists = self:_setRoomAnchors()
-    self:_placeRooms(anchorsLists)
+    local roomIndex = self:_placeRooms(anchorsLists)
+    local unconnetedRoomIndices = self:_fillUnconnectedRooms(roomIndex)
+    local roomList = self:_getRoomsPerIndex()
+
+    -- debug(roomList)
+end
+
+function debug(roomList)
+    for z = 1, #roomList do
+        print("------- Floor : ", z)
+        local rooms = roomList[z]
+        for i = 1, #rooms do
+            local r = rooms[i]
+            print(r.x, r.y, r.w, r.h, r.roomIndex)
+        end
+    end
+end
+
+function Generator:_getRoomsPerIndex()
+    local width = self.map.width
+    local height = self.map.height
+
+    local roomListPerIndex = {}
+
+    local horizontalOffset = 1
+    local verticalOffset = width
+
+    for z = 1, self.map.depth do
+        local floorCells = self.map.floorCells[z]
+        local floorBrowsedIndices = {} -- should init it to avoid performance issues
+        roomListPerIndex[z] = {}
+        for y = 2, height - 1 do
+            local yOffset = y * width
+            for x = 2, width - 1 do
+                local currentCellIndex = yOffset + x
+                local currentCell = floorCells[currentCellIndex]
+
+                if currentCell.tileRef == Cell.ROOM then
+                    local roomIndexString = ""..currentCell.roomIndex
+                    if not (floorBrowsedIndices[roomIndexString]) then
+                        floorBrowsedIndices[roomIndexString] = true
+                        local room = RectangleRoom:new(x, y, 1, 1, currentCell.roomIndex)
+
+                        -- horizontally
+                        local roomCellIndex = currentCellIndex + 1
+                        local nextCell = floorCells[roomCellIndex]
+                        while nextCell.roomIndex == room.roomIndex do
+                            room.w = room.w + 1
+                            roomCellIndex = roomCellIndex + 1
+                            nextCell = floorCells[roomCellIndex]
+                        end
+
+                        -- vertically
+                        roomCellIndex = currentCellIndex + width
+                        nextCell = floorCells[roomCellIndex]
+                        while nextCell.roomIndex == room.roomIndex do
+                            room.h = room.h + 1
+                            roomCellIndex = roomCellIndex + width
+                            nextCell = floorCells[roomCellIndex]
+                        end
+
+                        roomListPerIndex[z][#(roomListPerIndex[z]) + 1] = room
+                    end
+                end
+            end
+        end
+    end
+    return roomListPerIndex
+end
+
+function Generator:_fillUnconnectedRooms(roomIndex)
+    local width = self.map.width
+    local height = self.map.height
+
+    local horizontalOffset = 1
+    local verticalOffset = width
+
+    local addedRoomIndices = {}
+
+    for z = 1, self.map.depth do
+        local floorCells = self.map.floorCells[z]
+        addedRoomIndices[z] = {}
+        for y = 1, height - 1 do
+            local yOffset = (y - 1) * width
+            for x = 1, width - 1 do
+                local currentCellIndex = yOffset + x
+                local currentCell = floorCells[currentCellIndex]
+
+                if currentCell.tileRef == Cell.UNDEFINED then
+                    local currentCellIndexStack = {currentCellIndex}
+                    while #currentCellIndexStack > 0 do
+                        local currentCellIndexFromStack = currentCellIndexStack[1]
+                        local currentCellFromStack = floorCells[currentCellIndexFromStack]
+
+                        currentCellFromStack.tileRef = Cell.ROOM
+                        currentCellFromStack.roomIndex = roomIndex
+
+                        local rightCellIndex = currentCellIndexFromStack + horizontalOffset
+                        local bottomCellIndex = currentCellIndexFromStack + verticalOffset
+
+                        if (floorCells[rightCellIndex].tileRef == Cell.UNDEFINED) then
+                            currentCellIndexStack[#currentCellIndexStack + 1] = rightCellIndex
+                        end
+
+                        if (floorCells[bottomCellIndex].tileRef == Cell.UNDEFINED) then
+                            currentCellIndexStack[#currentCellIndexStack + 1] = bottomCellIndex
+                        end
+
+                        table.remove(currentCellIndexStack, 1)
+                    end
+
+                    addedRoomIndices[z][#addedRoomIndices + 1] = roomIndex
+
+                    roomIndex = roomIndex + 1
+                end
+            end
+        end
+    end
+    return addedRoomIndices
 end
 
 function Generator:_placeRooms(anchorsLists)
@@ -60,6 +179,8 @@ function Generator:_placeRooms(anchorsLists)
             end
         end
     end
+
+    return roomIndex
 end
 
 function Generator:_getGrowthDirectionOffsets(currentCell)
