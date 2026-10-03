@@ -10,8 +10,6 @@ local generator = nil
 local prng = love.math.random
 local quads = {}
 
-local maxStepCount = 100
-
 local drawIndices = false
 local fusionLevel = 2
 local drawWithWalls = true
@@ -69,7 +67,7 @@ function regenerateMap()
     map = Map:new(16, 16, 12)
     love.math.setRandomSeed(seed)
     generator = Generator:new(map, prng)
-    generator:generateMap(maxStepCount, fusionLevel)
+    generator:generateMap(fusionLevel)
 end
 
 function love.load()
@@ -88,22 +86,10 @@ function love.keypressed( key, scancode, isrepeat )
 end
 
 function love.update(dt)
-    local isZPressed = love.keyboard.isDown("z")
-    local isSPressed = love.keyboard.isDown("s")
     local isRPressed = love.keyboard.isDown("r")
     local isCPressed = love.keyboard.isDown("c")
     local isFPressed = love.keyboard.isDown("f")
     local isDPressed = love.keyboard.isDown("d")
-
-    if isZPressed and not wasZPressed then
-        maxStepCount = maxStepCount + 1
-        regenerateMap()
-    end
-
-    if isSPressed and not wasSPressed then
-        maxStepCount = maxStepCount - 1
-        regenerateMap()
-    end
 
     if isRPressed and not wasRPressed then
         seed = os.time()
@@ -156,9 +142,9 @@ function love.draw()
         local floorCells = map.floorCells[z];
 
         if drawWithWalls then
-            displayFloor(floorCells, map.width, map.height, currentOriginX, currentOriginY)
-        else
             displayFloorWithWalls(floorCells, map.width, map.height, currentOriginX, currentOriginY)
+        else
+            displayFloor(floorCells, map.width, map.height, currentOriginX, currentOriginY)
         end
         
         
@@ -175,7 +161,6 @@ function love.draw()
     -- draw quick UI
     local strings = {
         "(r) regenerate",
-        "(z)/(s) step count: " .. maxStepCount,
         "(d) draw color or walls: " .. (drawWithWalls and "wall" or "colors"),
         "(f) fusion mode:" .. ((fusionLevel == 2 and "full") or (fusionLevel == 1 and "shared edges") or "none"),
         "(c) show cell room indices: " .. (drawIndices and "Yes" or "No"),

@@ -23,10 +23,9 @@ function Generator:new(map, prng)
     return o
 end
 
-function Generator:generateMap(maxStepCount, fusionLevel)
+function Generator:generateMap(fusionLevel)
     self:_initialise()
-    self:_buildCorridors(maxStepCount)
-    -- self:_buildFakeCorridors(maxStepCount)
+    self:_buildCorridors()
     local anchorsLists = self:_setRoomAnchors()
     local roomIndex = self:_placeRooms(anchorsLists)
     local unconnetedRoomIndices = self:_fillUnconnectedRooms(roomIndex)
@@ -657,11 +656,9 @@ function Generator:_initialise()
     end
 end
 
-function Generator:_buildCorridors(maxStepCount)
+function Generator:_buildCorridors()
     local corridorStartingIndex = self:_placeElevator()
     local corridorTargetRatio = self.map.width * self.map.height * self.CORRIDOR_RATIO
-
-    local stepCount = 0
 
     for z = 1, self.map.depth do
         local corridorStartCells = {corridorStartingIndex}
@@ -669,7 +666,7 @@ function Generator:_buildCorridors(maxStepCount)
         local floorCells = self.map.floorCells[z]
         local corridorCellCount = 1
 
-        while corridorCellCount < corridorTargetRatio and stepCount < maxStepCount do
+        while corridorCellCount < corridorTargetRatio do
             local pickedCellIndex = self.prng(1, corridorStartCellsCount)
             local pickedCellMapIndex = corridorStartCells[pickedCellIndex]
             local availableDirections = self:_getCellAvailableDirections(floorCells, pickedCellMapIndex)
@@ -691,28 +688,8 @@ function Generator:_buildCorridors(maxStepCount)
             else
                 table.remove(corridorStartCells, pickedCellIndex)
             end
-
-            stepCount = stepCount + 1
         end
     end    
-end
-
-function Generator:_buildFakeCorridors(maxStepCount)
-    -- force elevator to the center
-    local width = self.map.width
-    local height = self.map.height
-
-    local centerIndex = math.ceil(width * height / 2)
-    local corridorIndex = centerIndex + width
-
-    self.map.floorCells[1][centerIndex].tileRef = Cell.ELEVATOR
-    self.map.floorCells[1][corridorIndex].tileRef = Cell.CORRIDOR
-
-    local distanceToCarveCorridor = (width / 2) - 3
-    for i = 1, distanceToCarveCorridor do
-        self.map.floorCells[1][corridorIndex + i].tileRef = Cell.CORRIDOR
-        self.map.floorCells[1][corridorIndex - i].tileRef = Cell.CORRIDOR
-    end
 end
 
 function Generator:_getMaxDistanceFromCellInDirection(floorCells, cellIndex, stepInDirection)
