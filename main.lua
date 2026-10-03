@@ -3,14 +3,17 @@ require("src/generators/generator")
 
 local seed = os.time()
 
-local CELL_SIZE = 18
+local CELL_SIZE = 15
 local map = nil
 local tileSet = nil
 local generator = nil
 local prng = love.math.random
 local quads = {}
 
-local maxStepCount = 5
+local maxStepCount = 250
+
+local displayCorridors = true
+local doFusion = true
 
 local colors = {
     {0, 0, 0, 1}, -- Cell.LIMIT
@@ -25,36 +28,46 @@ local colors = {
 }
 
 local roomColors = {
-    {0, 0, .25, .3},
-    {0, .25, 0, .3},
-    {.25, 0, 0, .3},
-    {.25, .25, 0, .3},
+    {0, 0, .5, 1},
+    {0, .5, 0, 1},
+    {.5, 0, 0, 1},
+    {.5, .5, 0, 1},
+    {.5, 0, .5, 1},
+    {0, .5, .5, 1},
 
-    {0, 0, .5, .3},
-    {0, .5, 0, .3},
-    {.75, 0, 0, .3},
-    {.5, .5, 0, .3},
+    {0, 0, .5, .75},
+    {0, .5, 0, .75},
+    {.5, 0, 0, .75},
+    {.5, .5, 0, .75},
+    {.5, 0, .5, .75},
+    {0, .5, .5, .75},
 
-    {0, 0, .75, .3},
-    {0, .75, 0, .3},
-    {.5, 0, 0, .3},
-    {.75, .75, 0, .3},
+    {0, 0, .5, .5},
+    {0, .5, 0, .5},
+    {.5, 0, 0, .5},
+    {.5, .5, 0, .5},
+    {.5, 0, .5, .5},
+    {0, .5, .5, .5},
 
-    {0, 0, 1, .3},
-    {0, 1, 0, .3},
-    {1, 0, 0, .3},
-    {1, .25, .15, .3},
+    {0, 0, .5, .25},
+    {0, .5, 0, .25},
+    {.5, 0, 0, .25},
+    {.5, .5, 0, .25},
+    {.5, 0, .5, .25},
+    {0, .5, .5, .25},
 }
 
 local wasZPressed = false
 local wasSPressed = false
 local wasRPressed = false
+local wasCPressed = false
+local wasFPressed = false
 
 function regenerateMap()
-    map = Map:new(15, 15, 6)
+    map = Map:new(15, 15, 15)
     love.math.setRandomSeed(seed)
     generator = Generator:new(map, prng)
-    generator:generateMap(maxStepCount)
+    generator:generateMap(maxStepCount, doFusion)
 end
 
 function love.load()
@@ -73,6 +86,8 @@ function love.update(dt)
     local isZPressed = love.keyboard.isDown("z")
     local isSPressed = love.keyboard.isDown("s")
     local isRPressed = love.keyboard.isDown("r")
+    local isCPressed = love.keyboard.isDown("c")
+    local isFPressed = love.keyboard.isDown("f")
     if isZPressed and not wasZPressed then
         maxStepCount = maxStepCount + 1
         regenerateMap()
@@ -88,9 +103,20 @@ function love.update(dt)
         regenerateMap()
     end
 
+    if isCPressed and not wasCPressed then
+        displayCorridors = not displayCorridors
+    end
+
+    if isFPressed and not wasFPressed then
+        doFusion = not doFusion
+        regenerateMap()
+    end
+
     wasZPressed = isZPressed
     wasSPressed = isSPressed
     wasRPressed = isRPressed
+    wasCPressed = isCPressed
+    wasFPressed = isFPressed
 end
 
 function love.draw()
@@ -129,7 +155,7 @@ function love.draw()
     end
 end
 
-function displayFloor(floorCells, width, height, origX, origY)
+function displayFloor(floorCells, width, height, origX, origY, lastDisplayedRoom)
     local i = 0
     for y = 0, (height - 1) do
         local yOffset = y * CELL_SIZE + origY
@@ -139,8 +165,10 @@ function displayFloor(floorCells, width, height, origX, origY)
 
             local cell = floorCells[i]
             local anchorCount = cell:anchorCount()
+            local drawIndex = false
             if cell.tileRef == Cell.ROOM then
                 love.graphics.setColor(roomColors[(cell.roomIndex % #roomColors) + 1])
+                drawIndex = true
             elseif anchorCount == 1 then
                 love.graphics.setColor(colors[6])
             elseif anchorCount == 2 then
@@ -153,6 +181,10 @@ function displayFloor(floorCells, width, height, origX, origY)
                 love.graphics.setColor(colors[cell.tileRef])
             end
             love.graphics.draw(tileSet, quads[1], xOffset, yOffset)
+            if drawIndex or not displayCorridors then
+                love.graphics.setColor(0, 0, 0, 1)
+                love.graphics.print(cell.roomIndex, xOffset, yOffset)
+            end
         end
     end
 end

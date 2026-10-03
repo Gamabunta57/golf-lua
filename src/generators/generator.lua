@@ -23,16 +23,96 @@ function Generator:new(map, prng)
     return o
 end
 
-function Generator:generateMap(maxStepCount)
+function Generator:generateMap(maxStepCount, doFusion)
     self:_initialise()
     self:_buildCorridors(maxStepCount)
     -- self:_buildFakeCorridors(maxStepCount)
     local anchorsLists = self:_setRoomAnchors()
     local roomIndex = self:_placeRooms(anchorsLists)
     local unconnetedRoomIndices = self:_fillUnconnectedRooms(roomIndex)
-    local roomList = self:_getRoomsPerIndex()
+    local roomLists = self:_getRoomsPerIndex()
+    if (doFusion) then
+        self:_fusionRooms(roomLists)
+    end
 
-    -- debug(roomList)
+    -- debug(roomLists)
+end
+
+function Generator:_fusionRooms(roomLists)
+    for z = 1, self.map.depth do
+        local roomList = roomLists[z]
+        local floorCells = self.map.floorCells[z]
+        local hasFusionedRoom = true
+        while hasFusionedRoom do
+            hasFusionedRoom = false
+            for rI = 1, #roomList do
+                local currentRoom = roomList[rI]
+                if (currentRoom) then
+                    local rightRoom, rightRoomListIndex = self:_getRightRoom(roomList, currentRoom)
+                    local bottomRoom, bottomRoomListIndex = self:_getBottomRoom(roomList, currentRoom)
+
+                    if not (rightRoom == nil) and currentRoom.h == rightRoom.h then
+                        self:_markRoomWithIndex(floorCells, rightRoom, currentRoom, true)
+                        table.remove(roomList, rightRoomListIndex)
+                        hasFusionedRoom = true
+                    end
+
+                    if not (bottomRoom == nil) and currentRoom.w == bottomRoom.w then
+                        self:_markRoomWithIndex(floorCells, bottomRoom, currentRoom, false)
+                        table.remove(roomList, bottomRoomListIndex)
+                        hasFusionedRoom = true
+                    end
+                end
+            end
+        end
+    end
+end
+
+function Generator:_getRightRoom(roomList, currentRoom)
+    for rI = 1, #roomList do
+        local room = roomList[rI]
+        if (room.y == currentRoom.y) and (room.x == (currentRoom.x + currentRoom.w))then 
+            return room, rI
+        end
+
+        if (currentRoom.y + currentRoom.h <= room.y) and (currentRoom.x + currentRoom.w <= room.x) then
+            return nil -- early exit, we passed all the possible candidates anyway
+        end
+    end
+    return nil
+end
+
+function Generator:_getBottomRoom(roomList, currentRoom)
+    for rI = 1, #roomList do
+        local room = roomList[rI]
+        if (room.x == currentRoom.x) and (room.y == (currentRoom.y + currentRoom.h)) then
+            return room, rI
+        end
+
+        if (currentRoom.y + currentRoom.h <= room.y) and (currentRoom.x + currentRoom.w <= room.x) then
+            return nil -- early exit, we passed all the possible candidates anyway
+        end
+    end
+    return nil
+end
+
+function Generator:_markRoomWithIndex(floorCells, roomToMark, roomToExpand, expandOnTheRight)
+    local width = self.map.width
+    local height = self.map.height
+
+    for y = roomToMark.y, (roomToMark.y + roomToMark.h - 1) do
+        local yOffset = (y - 1) * width
+        for x = roomToMark.x, (roomToMark.x + roomToMark.w - 1) do
+            local cellIndex = x + yOffset
+            floorCells[cellIndex].roomIndex = roomToExpand.roomIndex
+        end
+    end
+
+    if expandOnTheRight then
+        roomToExpand.w = roomToExpand.w + roomToMark.w
+    else
+        roomToExpand.h = roomToExpand.h + roomToMark.h
+    end
 end
 
 function debug(roomList)
@@ -41,7 +121,7 @@ function debug(roomList)
         local rooms = roomList[z]
         for i = 1, #rooms do
             local r = rooms[i]
-            print(r.x, r.y, r.w, r.h, r.roomIndex)
+            print(r.roomIndex, r.x, r.y, r.w, r.h)
         end
     end
 end
@@ -59,16 +139,15 @@ function Generator:_getRoomsPerIndex()
         local floorCells = self.map.floorCells[z]
         local floorBrowsedIndices = {} -- should init it to avoid performance issues
         roomListPerIndex[z] = {}
-        for y = 2, height - 1 do
-            local yOffset = y * width
-            for x = 2, width - 1 do
+        for y = 1, height - 1 do
+            local yOffset = (y - 1) * width
+            for x = 1, width - 1 do
                 local currentCellIndex = yOffset + x
                 local currentCell = floorCells[currentCellIndex]
 
                 if currentCell.tileRef == Cell.ROOM then
-                    local roomIndexString = ""..currentCell.roomIndex
-                    if not (floorBrowsedIndices[roomIndexString]) then
-                        floorBrowsedIndices[roomIndexString] = true
+                    if listDoesNotHave(floorBrowsedIndices, currentCell.roomIndex) then
+                        floorBrowsedIndices[#floorBrowsedIndices + 1] = currentCell.roomIndex
                         local room = RectangleRoom:new(x, y, 1, 1, currentCell.roomIndex)
 
                         -- horizontally
@@ -96,6 +175,15 @@ function Generator:_getRoomsPerIndex()
         end
     end
     return roomListPerIndex
+end
+
+function listDoesNotHave(list, value)
+    for i = 1, #list do
+        if (list[i] == value) then
+            return false
+        end
+    end
+    return true
 end
 
 function Generator:_fillUnconnectedRooms(roomIndex)
@@ -164,17 +252,21 @@ function Generator:_placeRooms(anchorsLists)
                 local currentCellIndex = currentList[i]
                 local currentCell = floorCells[currentCellIndex]
 
-                local growthDirectionOffsets = self:_getGrowthDirectionOffsets(currentCell)
+                if currentCell:hasAnchor() then
+                    if currentCell.tileRef == Cell.UNDEFINED then
+                        local growthDirectionOffsets = self:_getGrowthDirectionOffsets(currentCell)
 
-                if #growthDirectionOffsets == 0 then
-                    self:_markSingleCellRoom(floorCells, currentCellIndex, roomIndex)
-                    roomIndex = roomIndex + 1
-                elseif #growthDirectionOffsets == 1 then
-                    self:_growInSingleDirection(floorCells, currentCellIndex, growthDirectionOffsets[1], roomIndex)
-                    roomIndex = roomIndex + 1
-                elseif #growthDirectionOffsets == 2 then
-                    self:_growInDiagonalDirection(floorCells, currentCellIndex, growthDirectionOffsets, roomIndex)
-                    roomIndex = roomIndex + 1
+                        if #growthDirectionOffsets == 0 then
+                            self:_markSingleCellRoom(floorCells, currentCellIndex, roomIndex)
+                            roomIndex = roomIndex + 1
+                        elseif #growthDirectionOffsets == 1 then
+                            self:_growInSingleDirection(floorCells, currentCellIndex, growthDirectionOffsets[1], roomIndex)
+                            roomIndex = roomIndex + 1
+                        elseif #growthDirectionOffsets == 2 then
+                            self:_growInDiagonalDirection(floorCells, currentCellIndex, growthDirectionOffsets, roomIndex)
+                            roomIndex = roomIndex + 1
+                        end
+                    end
                 end
             end
         end
