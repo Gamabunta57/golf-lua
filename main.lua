@@ -3,24 +3,25 @@ require("src/generators/generator")
 
 local seed = os.time()
 
-local CELL_SIZE = 12
+local CELL_SIZE = 16
 local map = nil
 local tileSet = nil
 local generator = nil
 local prng = love.math.random
 local quads = {}
 
-local maxStepCount = 250
+local maxStepCount = 100
 
-local displayCorridors = true
+local drawIndices = false
 local fusionLevel = 2
+local drawWithWalls = true
 
 local colors = {
     {0, 0, 0, 1}, -- Cell.LIMIT
     {1, 0, 1, 1}, -- Cell.UNDEFINED
     {1, .5, .25, 1}, -- Cell.ELEVATOR
     {1, 1, 1, 1}, -- Cell.CORRIDOR
-    {1, 0, 1, 1}, -- Cell.ROOM
+    {1, 1, 1, .5}, -- Cell.ROOM
     {.5, .75, .25, 1}, -- Cell.hasAnchor // 1
     {.25, 1, .15, 1}, -- Cell.hasAnchor // 2
     {.15, 1, 1, 1}, -- Cell.hasAnchor // 3
@@ -62,9 +63,10 @@ local wasSPressed = false
 local wasRPressed = false
 local wasCPressed = false
 local wasFPressed = false
+local wasDPressed = false
 
 function regenerateMap()
-    map = Map:new(12, 12, 12)
+    map = Map:new(16, 16, 12)
     love.math.setRandomSeed(seed)
     generator = Generator:new(map, prng)
     generator:generateMap(maxStepCount, fusionLevel)
@@ -73,7 +75,10 @@ end
 function love.load()
     love.graphics.setBackgroundColor(.15, .15, .15, 1)
     tileSet = love.graphics.newImage("assets/images/tileset.png")
-    quads[1] = love.graphics.newQuad(0, 0, CELL_SIZE, CELL_SIZE, 0, 0)
+    quads[1] = love.graphics.newQuad(0, 0, CELL_SIZE, CELL_SIZE, tileSet)
+    quads[2] = love.graphics.newQuad(16, 0, CELL_SIZE, CELL_SIZE, tileSet)
+    quads[3] = love.graphics.newQuad(32, 0, CELL_SIZE, CELL_SIZE, tileSet)
+    quads[4] = love.graphics.newQuad(48, 0, CELL_SIZE, CELL_SIZE, tileSet)
 
     regenerateMap()
 end
@@ -88,6 +93,8 @@ function love.update(dt)
     local isRPressed = love.keyboard.isDown("r")
     local isCPressed = love.keyboard.isDown("c")
     local isFPressed = love.keyboard.isDown("f")
+    local isDPressed = love.keyboard.isDown("d")
+
     if isZPressed and not wasZPressed then
         maxStepCount = maxStepCount + 1
         regenerateMap()
@@ -104,7 +111,7 @@ function love.update(dt)
     end
 
     if isCPressed and not wasCPressed then
-        displayCorridors = not displayCorridors
+        drawIndices = not drawIndices
     end
 
     if isFPressed and not wasFPressed then
@@ -112,11 +119,17 @@ function love.update(dt)
         regenerateMap()
     end
 
+    if isDPressed and not wasDPressed then
+        drawWithWalls = not drawWithWalls
+        
+    end
+
     wasZPressed = isZPressed
     wasSPressed = isSPressed
     wasRPressed = isRPressed
     wasCPressed = isCPressed
     wasFPressed = isFPressed
+    wasDPressed = isDPressed
 end
 
 function love.draw()
@@ -142,7 +155,12 @@ function love.draw()
 
         local floorCells = map.floorCells[z];
 
-        displayFloor(floorCells, map.width, map.height, currentOriginX, currentOriginY)
+        if drawWithWalls then
+            displayFloor(floorCells, map.width, map.height, currentOriginX, currentOriginY)
+        else
+            displayFloorWithWalls(floorCells, map.width, map.height, currentOriginX, currentOriginY)
+        end
+        
         
         floorDisplayedInColumn = floorDisplayedInColumn + 1
         currentOriginY = currentOriginY + floorHeightPx
@@ -152,6 +170,21 @@ function love.draw()
             currentOriginX = currentOriginX + floorWidthPx
             currentOriginY = origY
         end
+    end
+
+    -- draw quick UI
+    local strings = {
+        "(r) regenerate",
+        "(z)/(s) step count: " .. maxStepCount,
+        "(d) draw color or walls: " .. (drawWithWalls and "wall" or "colors"),
+        "(f) fusion mode:" .. ((fusionLevel == 2 and "full") or (fusionLevel == 1 and "shared edges") or "none"),
+        "(c) show cell room indices: " .. (drawIndices and "Yes" or "No"),
+    }
+
+    love.graphics.setColor({1, 1, 1, 1})
+    for i = 1, #strings do
+        local s = strings[i]
+        love.graphics.print(s, 16, i * 16)
     end
 end
 
@@ -165,10 +198,9 @@ function displayFloor(floorCells, width, height, origX, origY, lastDisplayedRoom
 
             local cell = floorCells[i]
             local anchorCount = cell:anchorCount()
-            local drawIndex = false
+
             if cell.tileRef == Cell.ROOM then
                 love.graphics.setColor(roomColors[(cell.roomIndex % #roomColors) + 1])
-                drawIndex = true
             elseif anchorCount == 1 then
                 love.graphics.setColor(colors[6])
             elseif anchorCount == 2 then
@@ -181,9 +213,29 @@ function displayFloor(floorCells, width, height, origX, origY, lastDisplayedRoom
                 love.graphics.setColor(colors[cell.tileRef])
             end
             love.graphics.draw(tileSet, quads[1], xOffset, yOffset)
-            if drawIndex or not displayCorridors then
+            if drawIndices then
                 love.graphics.setColor(0, 0, 0, 1)
-                -- love.graphics.print(cell.roomIndex, xOffset, yOffset)
+                love.graphics.print(cell.roomIndex, xOffset, yOffset, 0, .6, .6)
+            end
+        end
+    end
+end
+
+function displayFloorWithWalls(floorCells, width, height, origX, origY, lastDisplayedRoom)
+    local i = 0
+    for y = 0, (height - 1) do
+        local yOffset = y * CELL_SIZE + origY
+        for x = 0, (width - 1) do
+            local xOffset = x * CELL_SIZE + origX
+            i = i + 1
+
+            local cell = floorCells[i]
+            local anchorCount = cell:anchorCount()
+            love.graphics.setColor(colors[cell.tileRef])
+            love.graphics.draw(tileSet, quads[cell.wallRef], xOffset, yOffset)
+            if drawIndices then
+                love.graphics.setColor(0, 0, 0, 1)
+                love.graphics.print(cell.roomIndex, xOffset, yOffset, 0, .6, .6)
             end
         end
     end

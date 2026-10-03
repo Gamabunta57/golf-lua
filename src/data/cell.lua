@@ -4,6 +4,10 @@ Cell = {
     ELEVATOR = 3,
     CORRIDOR = 4,
     ROOM = 5,
+    WALL_NONE = 1,
+    WALL_BOTTOM = 2,
+    WALL_RIGHT = 3,
+    WALL_RIGHT_AND_BOTTOM = 4
 }
 
 Cell.__index = Cell
@@ -13,6 +17,7 @@ function Cell:new()
         tileRef = Cell.UNDEFINED,
         roomIndex = 0,
         anchor = Cell.getEmptyAnchors(),
+        wallRef = Cell.WALL_NONE,
     }
     setmetatable(o, self)
     self.__index = self

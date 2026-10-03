@@ -37,8 +37,43 @@ function Generator:generateMap(maxStepCount, fusionLevel)
     if (fusionLevel > 1) then
         self:_fusionCorridorRooms(roomLists)
     end
+    self:_setWalls()
 
     -- debug(roomLists)
+end
+
+function Generator:_setWalls()
+    local width = self.map.width
+    local height = self.map.height
+    for z = 1, self.map.depth do
+        local floorCells = self.map.floorCells[z]
+        for y = 1, height - 1 do
+            local yOffset = (y - 1) * width
+            for x = 1, width do
+                local cellIndex = x + yOffset
+                local currentCell = floorCells[cellIndex]
+
+                if not (currentCell.tileRef == Cell.ELEVATOR) then 
+                    local rightCellIndex = cellIndex + 1
+                    local bottomCellIndex = cellIndex + width
+
+                    local rightCell = floorCells[rightCellIndex]
+                    local bottomCell = floorCells[bottomCellIndex]
+
+                    local wallOnRight = not (currentCell.roomIndex == rightCell.roomIndex)
+                    local wallOnBottom = not (currentCell.roomIndex == bottomCell.roomIndex)
+
+                    if wallOnRight and wallOnBottom then
+                        currentCell.wallRef = Cell.WALL_RIGHT_AND_BOTTOM
+                    elseif wallOnRight then
+                        currentCell.wallRef = Cell.WALL_RIGHT
+                    elseif wallOnBottom then
+                        currentCell.wallRef = Cell.WALL_BOTTOM
+                    end
+                end
+            end
+        end
+    end
 end
 
 function Generator:_fusionRooms(roomLists)
@@ -729,10 +764,14 @@ function Generator:_placeElevator()
 
     local floorCoord = yCoord * self.map.width + xCoord
     
+    
     local nextRowCell = floorCoord + self.map.width
 
     for z = 1, self.map.depth do
-        self.map.floorCells[z][floorCoord].tileRef = Cell.ELEVATOR
+        local elevatorCell = self.map.floorCells[z][floorCoord]
+        elevatorCell.roomIndex = -1 -- force a unique roomIndex to foce walls around
+        elevatorCell.wallRef = Cell.WALL_RIGHT
+        elevatorCell.tileRef = Cell.ELEVATOR
         self.map.floorCells[z][nextRowCell].tileRef = Cell.CORRIDOR
     end
 
