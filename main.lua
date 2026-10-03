@@ -3,7 +3,7 @@ require("src/generators/generator")
 
 local seed = os.time()
 
-local CELL_SIZE = 15
+local CELL_SIZE = 12
 local map = nil
 local tileSet = nil
 local generator = nil
@@ -13,7 +13,7 @@ local quads = {}
 local maxStepCount = 250
 
 local displayCorridors = true
-local doFusion = true
+local fusionLevel = 2
 
 local colors = {
     {0, 0, 0, 1}, -- Cell.LIMIT
@@ -64,10 +64,10 @@ local wasCPressed = false
 local wasFPressed = false
 
 function regenerateMap()
-    map = Map:new(15, 15, 15)
+    map = Map:new(12, 12, 12)
     love.math.setRandomSeed(seed)
     generator = Generator:new(map, prng)
-    generator:generateMap(maxStepCount, doFusion)
+    generator:generateMap(maxStepCount, fusionLevel)
 end
 
 function love.load()
@@ -108,7 +108,7 @@ function love.update(dt)
     end
 
     if isFPressed and not wasFPressed then
-        doFusion = not doFusion
+        fusionLevel = (fusionLevel + 1) % 3
         regenerateMap()
     end
 
@@ -183,7 +183,7 @@ function displayFloor(floorCells, width, height, origX, origY, lastDisplayedRoom
             love.graphics.draw(tileSet, quads[1], xOffset, yOffset)
             if drawIndex or not displayCorridors then
                 love.graphics.setColor(0, 0, 0, 1)
-                love.graphics.print(cell.roomIndex, xOffset, yOffset)
+                -- love.graphics.print(cell.roomIndex, xOffset, yOffset)
             end
         end
     end

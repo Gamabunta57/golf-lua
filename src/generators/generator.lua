@@ -23,7 +23,7 @@ function Generator:new(map, prng)
     return o
 end
 
-function Generator:generateMap(maxStepCount, doFusion)
+function Generator:generateMap(maxStepCount, fusionLevel)
     self:_initialise()
     self:_buildCorridors(maxStepCount)
     -- self:_buildFakeCorridors(maxStepCount)
@@ -31,8 +31,11 @@ function Generator:generateMap(maxStepCount, doFusion)
     local roomIndex = self:_placeRooms(anchorsLists)
     local unconnetedRoomIndices = self:_fillUnconnectedRooms(roomIndex)
     local roomLists = self:_getRoomsPerIndex()
-    if (doFusion) then
+    if (fusionLevel > 0) then
         self:_fusionRooms(roomLists)
+    end
+    if (fusionLevel > 1) then
+        self:_fusionCorridorRooms(roomLists)
     end
 
     -- debug(roomLists)
@@ -66,6 +69,103 @@ function Generator:_fusionRooms(roomLists)
             end
         end
     end
+end
+
+-- corridor rooms: rooms with width = 1 or height = 1
+function Generator:_fusionCorridorRooms(roomLists)
+    for z = 1, self.map.depth do
+        local roomList = roomLists[z]
+        local floorCells = self.map.floorCells[z]
+        for rI = #roomList, 1, -1 do
+            local currentRoom = roomList[rI]
+            if (currentRoom and not currentRoom.hasBeenMixed and (currentRoom.h == 1 or currentRoom.w == 1)) then
+                local neighbourRooms = self:_getNeighbourgRooms(floorCells, roomList, currentRoom)
+
+                if #neighbourRooms > 0 then
+                    local neighbourIndexToPick = self.prng(1, #neighbourRooms)
+                    self:_meltRoomIntoAnotherRoom(floorCells, currentRoom, neighbourRooms[neighbourIndexToPick])
+
+                    table.remove(roomList, rI)
+                end
+            end
+        end
+    end
+end
+
+function Generator:_getNeighbourgRooms(floorCells, roomList, currentRoom)
+    local width = self.map.width
+    local neighbourRooms = {}
+    local surroundingIndices = {}
+
+    local topLeftCornerX = currentRoom.x - 1
+    local topLeftCornerY = currentRoom.y - 1
+    local bottomRightCornerX = currentRoom.x + currentRoom.w
+    local bottomRightCornerY = currentRoom.y + currentRoom.h
+
+    local topYOffset = (topLeftCornerY - 1) * width
+    local bottomYOffset = (bottomRightCornerY - 1) * width
+    for i = topLeftCornerX + 1, bottomRightCornerX - 1 do -- +1 and -1 are to avoid corners
+        -- top row
+        local cellIndex = topYOffset + i
+        local cell = floorCells[cellIndex]
+
+        if cell.tileRef == Cell.ROOM and not (currentRoom.roomIndex == cell.roomIndex) and listDoesNotHave(surroundingIndices, cell.roomIndex) then
+            surroundingIndices[#surroundingIndices + 1] = cell.roomIndex
+        end
+
+        -- bottom row
+        cellIndex = bottomYOffset + i
+        cell = floorCells[cellIndex]
+
+        if cell.tileRef == Cell.ROOM and not (currentRoom.roomIndex == cell.roomIndex) and listDoesNotHave(surroundingIndices, cell.roomIndex) then
+            surroundingIndices[#surroundingIndices + 1] = cell.roomIndex
+        end
+    end
+
+    for i = topLeftCornerY + 1, bottomRightCornerY - 1 do
+        -- left column
+        local cellIndex = topLeftCornerX + ((i - 1) * width)
+        local cell = floorCells[cellIndex]
+
+        if cell.tileRef == Cell.ROOM and not (currentRoom.roomIndex == cell.roomIndex) and listDoesNotHave(surroundingIndices, cell.roomIndex) then
+            surroundingIndices[#surroundingIndices + 1] = cell.roomIndex
+        end
+
+        -- right column
+        cellIndex = bottomRightCornerX + ((i - 1) * width)
+        cell = floorCells[cellIndex]
+
+        if cell.tileRef == Cell.ROOM and not (currentRoom.roomIndex == cell.roomIndex) and listDoesNotHave(surroundingIndices, cell.roomIndex) then
+            surroundingIndices[#surroundingIndices + 1] = cell.roomIndex
+        end
+    end
+
+    for i = 1, #surroundingIndices do
+        for j = 1, #roomList do
+            local room = roomList[j]
+            if roomList[j].roomIndex == surroundingIndices[i] then
+                neighbourRooms[#neighbourRooms + 1] = room
+            end
+        end
+    end
+
+    return neighbourRooms
+end
+
+function Generator:_meltRoomIntoAnotherRoom(floorCells, roomToMelt, remainingRoom)
+    local width = self.map.width
+    local height = self.map.height
+
+    for y = roomToMelt.y, (roomToMelt.y + roomToMelt.h - 1) do
+        local yOffset = (y - 1) * width
+        for x = roomToMelt.x, (roomToMelt.x + roomToMelt.w - 1) do
+            local cellIndex = x + yOffset
+            floorCells[cellIndex].roomIndex = remainingRoom.roomIndex
+        end
+    end
+
+    roomToMelt.hasBeenMixed = true
+    remainingRoom.hasBeenMixed = true
 end
 
 function Generator:_getRightRoom(roomList, currentRoom)

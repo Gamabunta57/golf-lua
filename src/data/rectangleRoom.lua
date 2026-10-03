@@ -10,6 +10,7 @@ function RectangleRoom:new(x, y, w, h, ri)
         w = w or 0,
         h = h or 0,
         roomIndex = ri or 0,
+        hasBeenMixed = false
     }
 
     setmetatable(o, self)
