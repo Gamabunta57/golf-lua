@@ -1,5 +1,6 @@
 require("src/data/cell")
 require("src/data/rectangleRoom")
+require("src/data/graphNode")
 
 Anchors = {
     TO_TOP = 1,
@@ -30,15 +31,52 @@ function Generator:generateMap(fusionLevel)
     local roomIndex = self:_placeRooms(anchorsLists)
     local unconnetedRoomIndices = self:_fillUnconnectedRooms(roomIndex)
     local roomLists = self:_getRoomsPerIndex()
+
     if (fusionLevel > 0) then
         self:_fusionRooms(roomLists)
+        if (fusionLevel > 1) then
+            self:_fusionCorridorRooms(roomLists)
+        end
+        self:_setWalls()
+
+        local roomGraphForPlayer = self:_getRoomGraphForPlayer(roomLists)
+    
+        debugGraph(roomGraphForPlayer)
     end
-    if (fusionLevel > 1) then
-        self:_fusionCorridorRooms(roomLists)
-    end
-    self:_setWalls()
 
     -- debug(roomLists)
+end
+
+-- rooms in the list are rectangular shaped however,
+-- on the map it's not the case anymore at this stage
+function Generator:_getRoomGraphForPlayer(roomLists)
+    -- create all corridor nodes
+    local corridorNodes = {}
+    for f = 1, self.map.depth do
+        local nextCorridorNode = GraphNode:new(f.."C") -- 1C is the 1st floor corridor for instance
+        corridorNodes[f] = nextCorridorNode
+    end
+
+    -- link corridor nodes together because of the elevator
+    for i = 1, self.map.depth - 1 do
+        for j = i + 1, self.map.depth do
+            corridorNodes[i]:connect(corridorNodes[j])
+            corridorNodes[j]:connect(corridorNodes[i])
+        end
+    end
+
+    for z = 1, #roomLists do
+        local floorRoomList = roomLists[z]
+        local floorCorridor = corridorNodes[z]
+
+        for r = 1, #floorRoomList do
+            local roomNode = GraphNode:new(z.."R"..r) -- 1R2 is the 1st floor Room 2 for instance
+            roomNode:connect(floorCorridor)
+            floorCorridor:connect(roomNode)
+        end
+    end
+
+    return corridorNodes[1]
 end
 
 function Generator:_setWalls()
@@ -249,17 +287,6 @@ function Generator:_markRoomWithIndex(floorCells, roomToMark, roomToExpand, expa
     end
 end
 
-function debug(roomList)
-    for z = 1, #roomList do
-        print("------- Floor : ", z)
-        local rooms = roomList[z]
-        for i = 1, #rooms do
-            local r = rooms[i]
-            print(r.roomIndex, r.x, r.y, r.w, r.h)
-        end
-    end
-end
-
 function Generator:_getRoomsPerIndex()
     local width = self.map.width
     local height = self.map.height
@@ -309,15 +336,6 @@ function Generator:_getRoomsPerIndex()
         end
     end
     return roomListPerIndex
-end
-
-function listDoesNotHave(list, value)
-    for i = 1, #list do
-        if (list[i] == value) then
-            return false
-        end
-    end
-    return true
 end
 
 function Generator:_fillUnconnectedRooms(roomIndex)
@@ -753,4 +771,35 @@ function Generator:_placeElevator()
     end
 
     return nextRowCell
+end
+
+function debug(roomList)
+    for z = 1, #roomList do
+        print("------- Floor : ", z)
+        local rooms = roomList[z]
+        for i = 1, #rooms do
+            local r = rooms[i]
+            print(r.roomIndex, r.x, r.y, r.w, r.h)
+        end
+    end
+end
+
+function debugGraph(node, depth)
+    if (not node.printed) then 
+        node.printed = true
+        depth = depth or 0
+        print(string.rep("\t", depth) .. node.name)
+        for i = 1, #(node.linkedTo) do
+            debugGraph(node.linkedTo[i], depth + 1)
+        end
+    end
+end
+
+function listDoesNotHave(list, value)
+    for i = 1, #list do
+        if (list[i] == value) then
+            return false
+        end
+    end
+    return true
 end
