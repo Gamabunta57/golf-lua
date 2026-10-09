@@ -18,3 +18,17 @@ function RectangleRoom:new(x, y, w, h, ri)
 
     return o
 end
+
+function RectangleRoom:overlaps(other)
+    local startXA = self.x
+    local endXA = self.x + self.w
+    local startXB = other.x
+    local endXB = other.x + other.w
+
+    local startYA = self.y
+    local endYA = self.y + self.h
+    local startYB = other.y
+    local endYB = other.y + other.h
+
+    return startXA < endXB and endXA > startXB and startYA < endYB and endYA > startYB
+end

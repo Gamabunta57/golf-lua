@@ -143,6 +143,7 @@ function love.draw()
 
         if drawWithWalls then
             displayFloorWithWalls(floorCells, map.width, map.height, currentOriginX, currentOriginY)
+            displayFloorRoomNames(map.roomLists[z], currentOriginX, currentOriginY)
         else
             displayFloor(floorCells, map.width, map.height, currentOriginX, currentOriginY)
         end
@@ -223,5 +224,15 @@ function displayFloorWithWalls(floorCells, width, height, origX, origY, lastDisp
                 love.graphics.print(cell.roomIndex, xOffset, yOffset, 0, .6, .6)
             end
         end
+    end
+end
+
+function displayFloorRoomNames(roomList, origX, origY)
+    love.graphics.setColor(0, 0, 0, 1)
+    for rI = 1, #roomList do
+        local room = roomList[rI]
+        local xOffset = origX + (room.x - 1) * CELL_SIZE
+        local yOffset = origY + (room.y - 1) * CELL_SIZE
+        love.graphics.print(room.name or rI, xOffset, yOffset, 0, .6, .6)
     end
 end

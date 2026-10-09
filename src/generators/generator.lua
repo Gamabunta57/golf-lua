@@ -40,9 +40,8 @@ function Generator:generateMap(fusionLevel)
         self:_setWalls()
 
         local roomGraphForPlayer = self:_getRoomGraphForPlayer(roomLists)
-    
-        debugGraph(roomGraphForPlayer)
     end
+    self.map.roomLists = roomLists
 
     -- debug(roomLists)
 end
@@ -53,7 +52,7 @@ function Generator:_getRoomGraphForPlayer(roomLists)
     -- create all corridor nodes
     local corridorNodes = {}
     for f = 1, self.map.depth do
-        local nextCorridorNode = GraphNode:new(f.."C") -- 1C is the 1st floor corridor for instance
+        local nextCorridorNode = GraphNode:new(f.."C ") -- 1C is the 1st floor corridor for instance
         corridorNodes[f] = nextCorridorNode
     end
 
@@ -65,16 +64,51 @@ function Generator:_getRoomGraphForPlayer(roomLists)
         end
     end
 
+    -- link rooms of a floor to its corridor
+    local roomNodePerFloors = {}
     for z = 1, #roomLists do
         local floorRoomList = roomLists[z]
         local floorCorridor = corridorNodes[z]
+
+        roomNodePerFloor = {}
 
         for r = 1, #floorRoomList do
             local roomNode = GraphNode:new(z.."R"..r) -- 1R2 is the 1st floor Room 2 for instance
             roomNode:connect(floorCorridor)
             floorCorridor:connect(roomNode)
+
+            roomNodePerFloor[#roomNodePerFloor + 1] = roomNode
+            -- debug only
+            floorRoomList[r].name = roomNode.name
+        end
+
+        roomNodePerFloors[z] = roomNodePerFloor
+    end
+
+    -- link rooms from different floors that are on top of each others
+    for z = 1, #roomLists - 1 do
+        local currentFloorRooms = roomLists[z]
+        local nextFloorRooms = roomLists[z + 1]
+
+        local currentFloorRoomNodes = roomNodePerFloors[z]
+        local nextFloorRoomNodes = roomNodePerFloors[z + 1]
+
+        for i = 1, #currentFloorRooms do
+            local currentFloorRoom = currentFloorRooms[i]
+            for j = 1, #nextFloorRooms do
+                local nextFloorRoom = nextFloorRooms[j]
+
+                if currentFloorRoom:overlaps(nextFloorRoom) then
+                    local currentFloorRoomNode = currentFloorRoomNodes[i]
+                    local nextFloorRoomNode = nextFloorRoomNodes[j]
+                    currentFloorRoomNode:connect(nextFloorRoomNode)
+                    nextFloorRoomNode:connect(currentFloorRoomNode)
+                end
+            end
         end
     end
+
+    debugArrayGraph(corridorNodes)
 
     return corridorNodes[1]
 end
@@ -784,13 +818,32 @@ function debug(roomList)
     end
 end
 
-function debugGraph(node, depth)
-    if (not node.printed) then 
-        node.printed = true
-        depth = depth or 0
-        print(string.rep("\t", depth) .. node.name)
-        for i = 1, #(node.linkedTo) do
-            debugGraph(node.linkedTo[i], depth + 1)
+function debugArrayGraph(arrayGraph)
+    for i = 1, #arrayGraph do
+        local node = arrayGraph[i]
+        print(node.name)
+
+        if #(node.linkedTo) > 0 then
+            local childrenString = "    "
+            local subChildrenStrings = {}
+
+            for j = 1, #(node.linkedTo) do
+                local subNode = node.linkedTo[j]
+                childrenString = childrenString .. (subNode.name) .. " "
+            
+                if not (string.sub(subNode.name, 2, 2) == "C") then
+                    local subChildrenString = subNode.name .. ": "
+                    for k = 1, #(subNode.linkedTo) do
+                        local subSubNode = subNode.linkedTo[k]
+                        if not (string.sub(subSubNode.name, 2, 2) == "C") then
+                            subChildrenString = subChildrenString .. (subSubNode.name) .. " "
+                        end
+                    end
+                    subChildrenStrings[#subChildrenStrings + 1] = subChildrenString
+                end
+            end
+            print(childrenString)
+            print(table.concat(subChildrenStrings, "\n"))
         end
     end
 end
