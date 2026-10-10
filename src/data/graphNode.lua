@@ -7,6 +7,8 @@ function GraphNode:new(name)
     local o = {
         name = name or "no-name",
         linkedTo = {},
+        pathTo = {},
+        browsed = false
     }
     setmetatable(o, self)
     self.__index = self

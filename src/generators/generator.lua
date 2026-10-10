@@ -40,10 +40,48 @@ function Generator:generateMap(fusionLevel)
         self:_setWalls()
 
         local roomGraphForPlayer = self:_getRoomGraphForPlayer(roomLists)
+        self:_makePathForPlayer(roomGraphForPlayer)
     end
     self.map.roomLists = roomLists
 
     -- debug(roomLists)
+end
+
+function Generator:_makePathForPlayer(playerRoomGraph)
+    local nodeStack = {playerRoomGraph}
+    local nodeStackIndex = 1
+
+    while nodeStackIndex > 0 do
+        local currentNode = nodeStack[nodeStackIndex]
+        local possiblePath = self:_getPossiblePath(currentNode.linkedTo)
+
+        currentNode.browsed = true
+
+        if #possiblePath > 0 then
+            local pickedPathIndex = self.prng(1, #possiblePath)
+            local nextNode = possiblePath[pickedPathIndex]
+
+            currentNode.pathTo[#currentNode.pathTo] = nextNode
+            print(currentNode.name .. " => ", nextNode.name)
+            currentNode = nextNode
+
+            nodeStackIndex = nodeStackIndex + 1
+            nodeStack[nodeStackIndex] = currentNode
+        else
+            nodeStackIndex = nodeStackIndex - 1
+        end
+    end
+end
+
+function Generator:_getPossiblePath(graphNodeList)
+    local possiblePath = {}
+    for i = 1, #graphNodeList do
+        local node = graphNodeList[i]
+        if not node.browsed then
+            possiblePath[#possiblePath + 1] = node
+        end
+    end
+    return possiblePath
 end
 
 -- rooms in the list are rectangular shaped however,
@@ -108,7 +146,7 @@ function Generator:_getRoomGraphForPlayer(roomLists)
         end
     end
 
-    debugArrayGraph(corridorNodes)
+    -- debugArrayGraph(corridorNodes)
 
     return corridorNodes[1]
 end

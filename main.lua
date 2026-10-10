@@ -77,6 +77,8 @@ function love.load()
     quads[2] = love.graphics.newQuad(16, 0, CELL_SIZE, CELL_SIZE, tileSet)
     quads[3] = love.graphics.newQuad(32, 0, CELL_SIZE, CELL_SIZE, tileSet)
     quads[4] = love.graphics.newQuad(48, 0, CELL_SIZE, CELL_SIZE, tileSet)
+    quads[5] = love.graphics.newQuad(64, 0, CELL_SIZE, CELL_SIZE, tileSet)
+    quads[6] = love.graphics.newQuad(80, 0, CELL_SIZE, CELL_SIZE, tileSet)
 
     regenerateMap()
 end
