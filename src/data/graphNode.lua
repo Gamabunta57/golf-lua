@@ -6,9 +6,14 @@ GraphNode.__index = GraphNode
 function GraphNode:new(name)
     local o = {
         name = name or "no-name",
+        location = {
+            floor = 0,
+            roomIndex = 0,
+        },
         linkedTo = {},
         pathTo = {},
-        browsed = false
+        browsed = false,
+        isCorridor = false,
     }
     setmetatable(o, self)
     self.__index = self

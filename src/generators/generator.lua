@@ -40,16 +40,112 @@ function Generator:generateMap(fusionLevel)
         self:_setWalls()
 
         local roomGraphForPlayer = self:_getRoomGraphForPlayer(roomLists)
-        self:_makePathForPlayer(roomGraphForPlayer)
+        local graphConnectionlist = self:_makePathForPlayer(roomGraphForPlayer)
+        self:_physicallyConnectRoomsFollowingGraphPath(roomLists, graphConnectionlist)
     end
     self.map.roomLists = roomLists
 
     -- debug(roomLists)
 end
 
+function Generator:_physicallyConnectRoomsFollowingGraphPath(roomLists, connectionList)
+    for i = 1, #connectionList do
+        local connection = connectionList[i]
+        local nodeA = connection[1]
+        local nodeB = connection[2]
+
+        if nodeA.isCorridor and not nodeB.isCorridor then
+            self:_connectRoomToCorridor(nodeA, nodeB, roomLists)
+        elseif nodeB.isCorridor and not nodeA.isCorridor then
+            self:_connectRoomToCorridor(nodeB, nodeA, roomLists)
+        elseif not nodeB.isCorridor and not nodeA.isCorridor then
+            self:_connectRooms(nodeA, nodeB, roomLists)
+        else
+            print("skip corridor connections")
+        end
+    end
+end
+
+function Generator:_connectRoomToCorridor(corridorNode, roomNode, roomLists)
+    local width = self.map.width
+    local roomLocation = roomNode.location
+    local roomToConnect = roomLists[roomLocation.floor][roomLocation.roomIndex]
+    local floorCells = self.map.floorCells[roomLocation.floor]
+    
+    local connectedCorridorCellIndicies = {}
+    
+    -- check top cells and bottom cells surrounding the main frame of the room
+    local origX = roomToConnect.x
+    for i = 0, roomToConnect.w - 1 do
+        local topFloorCellIndex = origX + i + (roomToConnect.y - 1) * width
+        local bottomFloorCellIndex = topFloorCellIndex + roomToConnect.h * width
+        
+        local topCell = floorCells[topFloorCellIndex]
+        local bottomCell = floorCells[bottomFloorCellIndex]
+
+        if (topCell.tileRef == Cell.CORRIDOR) then
+            connectedCorridorCellIndicies[#connectedCorridorCellIndicies + 1] = {topFloorCellIndex, Anchors.TO_BOTTOM}
+        end
+        if (bottomCell.tileRef == Cell.CORRIDOR) then
+            connectedCorridorCellIndicies[#connectedCorridorCellIndicies + 1] = {bottomFloorCellIndex, Anchors.TO_TOP}
+        end
+    end
+
+    -- check left cells and right cells surrounding the main frame of the room
+    local origY = roomToConnect.y
+    for i = 0, roomToConnect.h - 1 do
+        local leftFloorCellIndex = (origY + i) * width + (roomToConnect.x - 1)
+        local rightFloorCellIndex = leftFloorCellIndex + roomToConnect.w
+        
+        local leftCell = floorCells[leftFloorCellIndex]
+        local rightCell = floorCells[rightFloorCellIndex]
+
+        if (leftCell.tileRef == Cell.CORRIDOR) then
+            connectedCorridorCellIndicies[#connectedCorridorCellIndicies + 1] = {leftFloorCellIndex, Anchors.TO_RIGHT}
+        end
+        if (rightCell.tileRef == Cell.CORRIDOR) then
+            connectedCorridorCellIndicies[#connectedCorridorCellIndicies + 1] = {rightFloorCellIndex, Anchors.TO_LEFT}
+        end
+    end
+
+    print("connect", corridorNode.name, roomNode.name, #connectedCorridorCellIndicies)
+
+    -- pick a random cell to open and open it
+    if (#connectedCorridorCellIndicies > 0) then
+        local connectionIndex = self.prng(1, #connectedCorridorCellIndicies)
+        local corridorCellToOpenTo = connectedCorridorCellIndicies[connectionIndex]
+        local corridorCellIndex = corridorCellToOpenTo[1]
+        local directionToOpen = corridorCellToOpenTo[2]
+
+        print(connectionIndex, corridorCellIndex, directionToOpen)
+
+        local cell = nil
+        if (directionToOpen == Anchors.TO_TOP) then
+            cell = floorCells[corridorCellIndex - width]
+            cell.openings = Cell.OPENED_BOTTOM
+        elseif (directionToOpen == Anchors.TO_RIGHT) then
+            cell = floorCells[corridorCellIndex]
+            cell.openings = Cell.OPENED_RIGHT
+        elseif (directionToOpen == Anchors.TO_BOTTOM) then
+            cell = floorCells[corridorCellIndex]
+            cell.openings = Cell.OPENED_BOTTOM
+        elseif (directionToOpen == Anchors.TO_LEFT) then
+            cell = floorCells[corridorCellIndex - 1]
+            cell.openings = Cell.OPENED_RIGHT
+        end
+        print("cell", cell.openings)
+    end
+end
+
+function Generator:_connectRooms(nodeA, nodeB, roomLists)
+    -- print("skipped for", nodeA.name, nodeB.name)
+end
+
 function Generator:_makePathForPlayer(playerRoomGraph)
     local nodeStack = {playerRoomGraph}
     local nodeStackIndex = 1
+
+    local connectionList = {}
 
     while nodeStackIndex > 0 do
         local currentNode = nodeStack[nodeStackIndex]
@@ -62,7 +158,7 @@ function Generator:_makePathForPlayer(playerRoomGraph)
             local nextNode = possiblePath[pickedPathIndex]
 
             currentNode.pathTo[#currentNode.pathTo] = nextNode
-            print(currentNode.name .. " => ", nextNode.name)
+            connectionList[#connectionList + 1] = {currentNode, nextNode}
             currentNode = nextNode
 
             nodeStackIndex = nodeStackIndex + 1
@@ -71,6 +167,8 @@ function Generator:_makePathForPlayer(playerRoomGraph)
             nodeStackIndex = nodeStackIndex - 1
         end
     end
+
+    return connectionList
 end
 
 function Generator:_getPossiblePath(graphNodeList)
@@ -91,6 +189,8 @@ function Generator:_getRoomGraphForPlayer(roomLists)
     local corridorNodes = {}
     for f = 1, self.map.depth do
         local nextCorridorNode = GraphNode:new(f.."C ") -- 1C is the 1st floor corridor for instance
+        nextCorridorNode.isCorridor = true
+        nextCorridorNode.location.floor = f
         corridorNodes[f] = nextCorridorNode
     end
 
@@ -112,6 +212,8 @@ function Generator:_getRoomGraphForPlayer(roomLists)
 
         for r = 1, #floorRoomList do
             local roomNode = GraphNode:new(z.."R"..r) -- 1R2 is the 1st floor Room 2 for instance
+            roomNode.location.floor = z
+            roomNode.location.roomIndex = r
             roomNode:connect(floorCorridor)
             floorCorridor:connect(roomNode)
 
@@ -136,7 +238,7 @@ function Generator:_getRoomGraphForPlayer(roomLists)
             for j = 1, #nextFloorRooms do
                 local nextFloorRoom = nextFloorRooms[j]
 
-                if currentFloorRoom:overlaps(nextFloorRoom) then
+                if not nextFloorRoom:isCorridorRoom() and currentFloorRoom:overlaps(nextFloorRoom) then
                     local currentFloorRoomNode = currentFloorRoomNodes[i]
                     local nextFloorRoomNode = nextFloorRoomNodes[j]
                     currentFloorRoomNode:connect(nextFloorRoomNode)
@@ -222,7 +324,7 @@ function Generator:_fusionCorridorRooms(roomLists)
         local floorCells = self.map.floorCells[z]
         for rI = #roomList, 1, -1 do
             local currentRoom = roomList[rI]
-            if (currentRoom and not currentRoom.hasBeenMixed and (currentRoom.h == 1 or currentRoom.w == 1)) then
+            if (currentRoom and not currentRoom.hasBeenMixed and currentRoom:isCorridorRoom()) then
                 local neighbourRooms = self:_getNeighbourgRooms(floorCells, roomList, currentRoom)
 
                 if #neighbourRooms > 0 then
@@ -869,11 +971,11 @@ function debugArrayGraph(arrayGraph)
                 local subNode = node.linkedTo[j]
                 childrenString = childrenString .. (subNode.name) .. " "
             
-                if not (string.sub(subNode.name, 2, 2) == "C") then
+                if not (subNode.isCorridor) then
                     local subChildrenString = subNode.name .. ": "
                     for k = 1, #(subNode.linkedTo) do
                         local subSubNode = subNode.linkedTo[k]
-                        if not (string.sub(subSubNode.name, 2, 2) == "C") then
+                        if not (subSubNode.isCorridor) then
                             subChildrenString = subChildrenString .. (subSubNode.name) .. " "
                         end
                     end

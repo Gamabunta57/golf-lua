@@ -7,7 +7,12 @@ Cell = {
     WALL_NONE = 1,
     WALL_BOTTOM = 2,
     WALL_RIGHT = 3,
-    WALL_RIGHT_AND_BOTTOM = 4
+    WALL_RIGHT_AND_BOTTOM = 4,
+    NO_OPENINGS = 0,
+    OPENED_BOTTOM = 1,
+    OPENED_RIGHT = 2,
+    STAIRCASE_UP = 3,
+    STAIRCASE_DOWN = 4,
 }
 
 Cell.__index = Cell
@@ -18,6 +23,7 @@ function Cell:new()
         roomIndex = 0,
         anchor = Cell.getEmptyAnchors(),
         wallRef = Cell.WALL_NONE,
+        openings = Cell.NO_OPENINGS,
     }
     setmetatable(o, self)
     self.__index = self

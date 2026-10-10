@@ -79,6 +79,8 @@ function love.load()
     quads[4] = love.graphics.newQuad(48, 0, CELL_SIZE, CELL_SIZE, tileSet)
     quads[5] = love.graphics.newQuad(64, 0, CELL_SIZE, CELL_SIZE, tileSet)
     quads[6] = love.graphics.newQuad(80, 0, CELL_SIZE, CELL_SIZE, tileSet)
+    quads[7] = love.graphics.newQuad(96, 0, CELL_SIZE, CELL_SIZE, tileSet)
+    quads[8] = love.graphics.newQuad(112, 0, CELL_SIZE, CELL_SIZE, tileSet)
 
     regenerateMap()
 end
@@ -218,12 +220,16 @@ function displayFloorWithWalls(floorCells, width, height, origX, origY, lastDisp
             i = i + 1
 
             local cell = floorCells[i]
-            local anchorCount = cell:anchorCount()
             love.graphics.setColor(colors[cell.tileRef])
             love.graphics.draw(tileSet, quads[cell.wallRef], xOffset, yOffset)
             if drawIndices then
                 love.graphics.setColor(0, 0, 0, 1)
                 love.graphics.print(cell.roomIndex, xOffset, yOffset, 0, .6, .6)
+            end
+
+            if not (cell.openings == Cell.NO_OPENINGS) then
+                love.graphics.setColor(1, 1, 1, 1)
+                love.graphics.draw(tileSet, quads[cell.openings + 4], xOffset, yOffset)
             end
         end
     end

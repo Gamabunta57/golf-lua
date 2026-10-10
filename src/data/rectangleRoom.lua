@@ -32,3 +32,7 @@ function RectangleRoom:overlaps(other)
 
     return startXA < endXB and endXA > startXB and startYA < endYB and endYA > startYB
 end
+
+function RectangleRoom:isCorridorRoom()
+    return self.w == 1 or self.h == 1
+end
