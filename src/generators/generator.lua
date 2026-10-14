@@ -54,6 +54,8 @@ function Generator:_physicallyConnectRoomsFollowingGraphPath(roomLists, connecti
         local nodeA = connection[1]
         local nodeB = connection[2]
 
+        print ("Connect", nodeA.name, nodeB.name)
+
         if nodeA.isCorridor and not nodeB.isCorridor then
             self:_connectRoomToCorridor(nodeA, nodeB, roomLists)
         elseif nodeB.isCorridor and not nodeA.isCorridor then
@@ -77,8 +79,8 @@ function Generator:_connectRoomToCorridor(corridorNode, roomNode, roomLists)
     -- check top cells and bottom cells surrounding the main frame of the room
     local origX = roomToConnect.x
     for i = 0, roomToConnect.w - 1 do
-        local topFloorCellIndex = origX + i + (roomToConnect.y - 1) * width
-        local bottomFloorCellIndex = topFloorCellIndex + roomToConnect.h * width
+        local topFloorCellIndex = origX + i + (roomToConnect.y - 2) * width
+        local bottomFloorCellIndex = topFloorCellIndex + (roomToConnect.h + 1) * width
         
         local topCell = floorCells[topFloorCellIndex]
         local bottomCell = floorCells[bottomFloorCellIndex]
@@ -94,8 +96,8 @@ function Generator:_connectRoomToCorridor(corridorNode, roomNode, roomLists)
     -- check left cells and right cells surrounding the main frame of the room
     local origY = roomToConnect.y
     for i = 0, roomToConnect.h - 1 do
-        local leftFloorCellIndex = (origY + i) * width + (roomToConnect.x - 1)
-        local rightFloorCellIndex = leftFloorCellIndex + roomToConnect.w
+        local leftFloorCellIndex = (origY + i - 1) * width + (roomToConnect.x - 1)
+        local rightFloorCellIndex = leftFloorCellIndex + roomToConnect.w + 1
         
         local leftCell = floorCells[leftFloorCellIndex]
         local rightCell = floorCells[rightFloorCellIndex]
@@ -108,32 +110,25 @@ function Generator:_connectRoomToCorridor(corridorNode, roomNode, roomLists)
         end
     end
 
-    print("connect", corridorNode.name, roomNode.name, #connectedCorridorCellIndicies)
-
     -- pick a random cell to open and open it
-    if (#connectedCorridorCellIndicies > 0) then
-        local connectionIndex = self.prng(1, #connectedCorridorCellIndicies)
-        local corridorCellToOpenTo = connectedCorridorCellIndicies[connectionIndex]
-        local corridorCellIndex = corridorCellToOpenTo[1]
-        local directionToOpen = corridorCellToOpenTo[2]
+    local connectionIndex = self.prng(1, #connectedCorridorCellIndicies)
+    local corridorCellToOpenTo = connectedCorridorCellIndicies[connectionIndex]
+    local corridorCellIndex = corridorCellToOpenTo[1]
+    local directionToOpen = corridorCellToOpenTo[2]
 
-        print(connectionIndex, corridorCellIndex, directionToOpen)
-
-        local cell = nil
-        if (directionToOpen == Anchors.TO_TOP) then
-            cell = floorCells[corridorCellIndex - width]
-            cell.openings = Cell.OPENED_BOTTOM
-        elseif (directionToOpen == Anchors.TO_RIGHT) then
-            cell = floorCells[corridorCellIndex]
-            cell.openings = Cell.OPENED_RIGHT
-        elseif (directionToOpen == Anchors.TO_BOTTOM) then
-            cell = floorCells[corridorCellIndex]
-            cell.openings = Cell.OPENED_BOTTOM
-        elseif (directionToOpen == Anchors.TO_LEFT) then
-            cell = floorCells[corridorCellIndex - 1]
-            cell.openings = Cell.OPENED_RIGHT
-        end
-        print("cell", cell.openings)
+    local cell = nil
+    if (directionToOpen == Anchors.TO_TOP) then
+        cell = floorCells[corridorCellIndex - width]
+        cell.openings = Cell.OPENED_BOTTOM
+    elseif (directionToOpen == Anchors.TO_RIGHT) then
+        cell = floorCells[corridorCellIndex]
+        cell.openings = Cell.OPENED_RIGHT
+    elseif (directionToOpen == Anchors.TO_BOTTOM) then
+        cell = floorCells[corridorCellIndex]
+        cell.openings = Cell.OPENED_BOTTOM
+    elseif (directionToOpen == Anchors.TO_LEFT) then
+        cell = floorCells[corridorCellIndex - 1]
+        cell.openings = Cell.OPENED_RIGHT
     end
 end
 
