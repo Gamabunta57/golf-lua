@@ -74,6 +74,41 @@ function Generator:_connectRoomToCorridor(corridorNode, roomNode, roomLists)
     local roomToConnect = roomLists[roomLocation.floor][roomLocation.roomIndex]
     local floorCells = self.map.floorCells[roomLocation.floor]
     
+    local connectedCorridorCellIndicies = self:_findSurroundingCorridorCells(floorCells, roomToConnect)
+
+    if #connectedCorridorCellIndicies == 0 then
+        local additionnalAreaRoomIndex = 0
+        while #connectedCorridorCellIndicies == 0 and additionnalAreaRoomIndex < #roomToConnect.additionalAreaRooms do
+            additionnalAreaRoomIndex = additionnalAreaRoomIndex + 1
+            local additionalAreaRoom = roomToConnect.additionalAreaRooms[additionnalAreaRoomIndex]
+            connectedCorridorCellIndicies = self:_findSurroundingCorridorCells(floorCells, additionalAreaRoom)
+        end
+    end
+
+    -- pick a random cell to open and open it
+    local connectionIndex = self.prng(1, #connectedCorridorCellIndicies)
+    local corridorCellToOpenTo = connectedCorridorCellIndicies[connectionIndex]
+    local corridorCellIndex = corridorCellToOpenTo[1]
+    local directionToOpen = corridorCellToOpenTo[2]
+
+    local cell = nil
+    if (directionToOpen == Anchors.TO_TOP) then
+        cell = floorCells[corridorCellIndex - width]
+        cell.openings = Cell.OPENED_BOTTOM
+    elseif (directionToOpen == Anchors.TO_RIGHT) then
+        cell = floorCells[corridorCellIndex]
+        cell.openings = Cell.OPENED_RIGHT
+    elseif (directionToOpen == Anchors.TO_BOTTOM) then
+        cell = floorCells[corridorCellIndex]
+        cell.openings = Cell.OPENED_BOTTOM
+    elseif (directionToOpen == Anchors.TO_LEFT) then
+        cell = floorCells[corridorCellIndex - 1]
+        cell.openings = Cell.OPENED_RIGHT
+    end
+end
+
+function Generator:_findSurroundingCorridorCells(floorCells, roomToConnect)
+    local width = self.map.width
     local connectedCorridorCellIndicies = {}
     
     -- check top cells and bottom cells surrounding the main frame of the room
@@ -110,30 +145,11 @@ function Generator:_connectRoomToCorridor(corridorNode, roomNode, roomLists)
         end
     end
 
-    -- pick a random cell to open and open it
-    local connectionIndex = self.prng(1, #connectedCorridorCellIndicies)
-    local corridorCellToOpenTo = connectedCorridorCellIndicies[connectionIndex]
-    local corridorCellIndex = corridorCellToOpenTo[1]
-    local directionToOpen = corridorCellToOpenTo[2]
-
-    local cell = nil
-    if (directionToOpen == Anchors.TO_TOP) then
-        cell = floorCells[corridorCellIndex - width]
-        cell.openings = Cell.OPENED_BOTTOM
-    elseif (directionToOpen == Anchors.TO_RIGHT) then
-        cell = floorCells[corridorCellIndex]
-        cell.openings = Cell.OPENED_RIGHT
-    elseif (directionToOpen == Anchors.TO_BOTTOM) then
-        cell = floorCells[corridorCellIndex]
-        cell.openings = Cell.OPENED_BOTTOM
-    elseif (directionToOpen == Anchors.TO_LEFT) then
-        cell = floorCells[corridorCellIndex - 1]
-        cell.openings = Cell.OPENED_RIGHT
-    end
+    return connectedCorridorCellIndicies
 end
 
 function Generator:_connectRooms(nodeA, nodeB, roomLists)
-    -- print("skipped for", nodeA.name, nodeB.name)
+    print("skipped for", nodeA.name, nodeB.name)
 end
 
 function Generator:_makePathForPlayer(playerRoomGraph)
@@ -407,6 +423,8 @@ function Generator:_meltRoomIntoAnotherRoom(floorCells, roomToMelt, remainingRoo
 
     roomToMelt.hasBeenMixed = true
     remainingRoom.hasBeenMixed = true
+
+    remainingRoom.additionalAreaRooms[#(remainingRoom.additionalAreaRooms) + 1] = roomToMelt
 end
 
 function Generator:_getRightRoom(roomList, currentRoom)

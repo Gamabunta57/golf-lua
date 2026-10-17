@@ -96,7 +96,8 @@ function love.update(dt)
     local isDPressed = love.keyboard.isDown("d")
 
     if isRPressed and not wasRPressed then
-        seed = os.time()
+        -- seed = os.time()
+        seed = seed + 1
         regenerateMap()
     end
 
