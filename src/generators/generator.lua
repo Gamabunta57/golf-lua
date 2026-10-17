@@ -63,8 +63,76 @@ function Generator:_physicallyConnectRoomsFollowingGraphPath(roomLists, connecti
         elseif not nodeB.isCorridor and not nodeA.isCorridor then
             self:_connectRooms(nodeA, nodeB, roomLists)
         else
-            print("skip corridor connections")
+            -- print("skip corridor connections")
         end
+    end
+end
+
+function Generator:_connectRooms(roomNodeA, roomNodeB, roomLists)
+    print("as 2 rooms")
+    local roomALocation = roomNodeA.location
+    local roomBLocation = roomNodeB.location
+    
+    local roomA = roomLists[roomALocation.floor][roomALocation.roomIndex]
+    local roomB = roomLists[roomBLocation.floor][roomBLocation.roomIndex]
+    print("roomA", roomA.x, roomA.y, roomA.w, roomA.h)
+    print("roomB", roomB.x, roomB.y, roomB.w, roomB.h)
+
+
+    local overlappingAreaStartPoint = {
+        x = 0,
+        y = 0,
+    }
+
+    local overlappingAreaEndPoint = {
+        x = 0,
+        y = 0,
+    }
+
+    if (roomA.x > roomB.x) then 
+        overlappingAreaStartPoint.x = roomA.x
+    else
+        overlappingAreaStartPoint.x = roomB.x
+    end
+
+    if (roomA.y > roomB.y) then 
+        overlappingAreaStartPoint.y = roomA.y
+    else
+        overlappingAreaStartPoint.y = roomB.y
+    end
+
+    if (roomA.x + roomA.w > roomB.x + roomB.w) then 
+        overlappingAreaEndPoint.x = roomA.x + roomA.w
+    else
+        overlappingAreaEndPoint.x = roomB.x + roomB.w
+    end
+
+    if (roomA.y + roomA.h > roomB.y + roomB.h) then 
+        overlappingAreaEndPoint.y = roomA.y + roomA.h
+    else
+        overlappingAreaEndPoint.y = roomB.y + roomB.h
+    end
+
+    local overlappingArea = {
+        x = overlappingAreaStartPoint.x,
+        y = overlappingAreaStartPoint.y,
+        w = overlappingAreaEndPoint.x - overlappingAreaStartPoint.x,
+        h = overlappingAreaEndPoint.y - overlappingAreaStartPoint.y,
+    }
+
+    local randX = self.prng(1, overlappingArea.w)
+    local randY = self.prng(1, overlappingArea.h)
+
+    local floorIndex = randX + (randY - 1) * self.map.width
+
+    local cellRoomA = self.map.floorCells[roomALocation.floor][floorIndex]
+    local cellRoomB = self.map.floorCells[roomBLocation.floor][floorIndex]
+
+    if (cellRoomA.tileRef == Cell.ROOM and cellRoomB.tileRef == Cell.ROOM) then
+        cellRoomA.openings = (roomALocation.floor > roomBLocation.floor and Cell.STAIRCASE_DOWN) or Cell.STAIRCASE_UP
+        cellRoomB.openings = (roomALocation.floor > roomBLocation.floor and Cell.STAIRCASE_UP) or Cell.STAIRCASE_DOWN
+    else
+        print("stairs already set", randX, randY, floorIndex, cellRoomA.tileRef, cellRoomB.tileRef)
     end
 end
 
@@ -146,10 +214,6 @@ function Generator:_findSurroundingCorridorCells(floorCells, roomToConnect)
     end
 
     return connectedCorridorCellIndicies
-end
-
-function Generator:_connectRooms(nodeA, nodeB, roomLists)
-    print("skipped for", nodeA.name, nodeB.name)
 end
 
 function Generator:_makePathForPlayer(playerRoomGraph)

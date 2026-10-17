@@ -86,7 +86,7 @@ function love.load()
 end
 
 function love.keypressed( key, scancode, isrepeat )
-    print("key: ", key, "scancode: ", scancode, "isrepeat: ", (isrepeat and "y" or "n"))
+    -- print("key: ", key, "scancode: ", scancode, "isrepeat: ", (isrepeat and "y" or "n"))
 end
 
 function love.update(dt)
