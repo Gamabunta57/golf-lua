@@ -54,30 +54,24 @@ function Generator:_physicallyConnectRoomsFollowingGraphPath(roomLists, connecti
         local nodeA = connection[1]
         local nodeB = connection[2]
 
-        print ("Connect", nodeA.name, nodeB.name)
-
         if nodeA.isCorridor and not nodeB.isCorridor then
             self:_connectRoomToCorridor(nodeA, nodeB, roomLists)
         elseif nodeB.isCorridor and not nodeA.isCorridor then
             self:_connectRoomToCorridor(nodeB, nodeA, roomLists)
         elseif not nodeB.isCorridor and not nodeA.isCorridor then
             self:_connectRooms(nodeA, nodeB, roomLists)
-        else
+        -- else
             -- print("skip corridor connections")
         end
     end
 end
 
 function Generator:_connectRooms(roomNodeA, roomNodeB, roomLists)
-    print("as 2 rooms")
     local roomALocation = roomNodeA.location
     local roomBLocation = roomNodeB.location
     
     local roomA = roomLists[roomALocation.floor][roomALocation.roomIndex]
     local roomB = roomLists[roomBLocation.floor][roomBLocation.roomIndex]
-    print("roomA", roomA.x, roomA.y, roomA.w, roomA.h)
-    print("roomB", roomB.x, roomB.y, roomB.w, roomB.h)
-
 
     local overlappingAreaStartPoint = {
         x = 0,
@@ -102,15 +96,15 @@ function Generator:_connectRooms(roomNodeA, roomNodeB, roomLists)
     end
 
     if (roomA.x + roomA.w > roomB.x + roomB.w) then 
-        overlappingAreaEndPoint.x = roomA.x + roomA.w
-    else
         overlappingAreaEndPoint.x = roomB.x + roomB.w
+    else
+        overlappingAreaEndPoint.x = roomA.x + roomA.w
     end
 
     if (roomA.y + roomA.h > roomB.y + roomB.h) then 
-        overlappingAreaEndPoint.y = roomA.y + roomA.h
-    else
         overlappingAreaEndPoint.y = roomB.y + roomB.h
+    else
+        overlappingAreaEndPoint.y = roomA.y + roomA.h
     end
 
     local overlappingArea = {
@@ -120,19 +114,19 @@ function Generator:_connectRooms(roomNodeA, roomNodeB, roomLists)
         h = overlappingAreaEndPoint.y - overlappingAreaStartPoint.y,
     }
 
-    local randX = self.prng(1, overlappingArea.w)
-    local randY = self.prng(1, overlappingArea.h)
+    local randX = self.prng(0, overlappingArea.w - 1)
+    local randY = self.prng(0, overlappingArea.h - 1)
 
-    local floorIndex = randX + (randY - 1) * self.map.width
+    local floorIndex = (overlappingArea.x + randX) + (randY + overlappingArea.y - 1) * self.map.width
 
     local cellRoomA = self.map.floorCells[roomALocation.floor][floorIndex]
     local cellRoomB = self.map.floorCells[roomBLocation.floor][floorIndex]
 
-    if (cellRoomA.tileRef == Cell.ROOM and cellRoomB.tileRef == Cell.ROOM) then
+    if (cellRoomA.openings == Cell.NO_OPENINGS and cellRoomB.openings == Cell.NO_OPENINGS) then
         cellRoomA.openings = (roomALocation.floor > roomBLocation.floor and Cell.STAIRCASE_DOWN) or Cell.STAIRCASE_UP
         cellRoomB.openings = (roomALocation.floor > roomBLocation.floor and Cell.STAIRCASE_UP) or Cell.STAIRCASE_DOWN
     else
-        print("stairs already set", randX, randY, floorIndex, cellRoomA.tileRef, cellRoomB.tileRef)
+        print("[DEBUG]: opening already set", roomNodeA.name, roomNodeB.name, overlappingArea.x, overlappingArea.y, overlappingArea.w, overlappingArea.h, randX, randY, floorIndex, cellRoomA.tileRef, cellRoomB.tileRef)
     end
 end
 

@@ -64,7 +64,7 @@ local wasFPressed = false
 local wasDPressed = false
 
 function regenerateMap()
-    map = Map:new(16, 16, 4)
+    map = Map:new(14, 14, 12)
     love.math.setRandomSeed(seed)
     generator = Generator:new(map, prng)
     generator:generateMap(fusionLevel)
