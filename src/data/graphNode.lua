@@ -23,3 +23,12 @@ end
 function GraphNode:connect(other)
     self.linkedTo[#(self.linkedTo) + 1] = other
 end
+
+function GraphNode:isPhysicallyConnectedTo(other)
+    for _, node in ipairs(self.pathTo) do
+        if (node == other) then
+            return true
+        end
+    end
+    return false
+end

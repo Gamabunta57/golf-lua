@@ -13,6 +13,8 @@ Cell = {
     OPENED_RIGHT = 2,
     STAIRCASE_UP = 3,
     STAIRCASE_DOWN = 4,
+    CLOSED_BOTTOM = 5,
+    CLOSED_RIGHT = 6,
 }
 
 Cell.__index = Cell
