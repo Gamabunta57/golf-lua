@@ -64,14 +64,14 @@ local wasFPressed = false
 local wasDPressed = false
 
 function regenerateMap()
-    map = Map:new(16, 16, 12)
+    map = Map:new(12, 12, 6)
     love.math.setRandomSeed(seed)
     generator = Generator:new(map, prng)
     generator:generateMap(fusionLevel)
 end
 
 function love.load()
-    love.graphics.setBackgroundColor(.15, .15, .15, 1)
+    love.graphics.setBackgroundColor(.1, .1, .1, 1)
     tileSet = love.graphics.newImage("assets/images/tileset.png")
     local tileSize = 16
     for i = 0, 9 do

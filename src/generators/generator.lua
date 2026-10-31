@@ -45,10 +45,133 @@ function Generator:generateMap(fusionLevel)
         local graphConnectionlist = self:_makePathForPlayer(roomGraphDetailsForPlayer.rootNode)
         self:_physicallyConnectRoomsFollowingGraphPath(roomLists, graphConnectionlist)
         self:_physicallyConnectClosedRoomsWithCorridors(roomLists, roomGraphDetailsForPlayer)
+
+        local graphDetailsForBall = self:_getGraphForBall(roomLists)
+        local ballGraphConnectionlist = self:_makePathForBall(graphDetailsForBall.rootNode)
+        self:_physicallyConnectRoomsForBallPath(roomLists, ballGraphConnectionlist)
+        
     end
     self.map.roomLists = roomLists
 
     -- debug(roomLists)
+end
+
+function Generator:_physicallyConnectRoomsForBallPath(roomLists, connectionList)
+    for i = 1, #connectionList do
+        local connection = connectionList[i]
+        local nodeA = connection[1]
+        local nodeB = connection[2]
+
+        -- if nodeA.isCorridor and not nodeB.isCorridor then
+        --     self:_connectRoomToCorridor(nodeA, nodeB, roomLists)
+        -- elseif nodeB.isCorridor and not nodeA.isCorridor then
+        --     self:_connectRoomToCorridor(nodeB, nodeA, roomLists)
+        -- elseif not nodeB.isCorridor and not nodeA.isCorridor and nodeB.location.floor == nodeA.location.floor then
+        --     self:_connectRoomsOnSameFloors(nodeA, nodeB, roomLists)
+        -- elseif not nodeB.isCorridor and not nodeA.isCorridor then
+        --     self:_connectRoomsOnDifferentFloors(nodeA, nodeB, roomLists)
+        -- -- else
+        --     -- print("skip corridor connections")
+        -- end
+
+        print(nodeA.name, "=>", nodeB.name)
+    end
+end
+
+function Generator:_getGraphForBall(roomLists)
+    -- create all corridor nodes
+    local corridorNodes = {}
+    for f = 1, self.map.depth do
+        local nextCorridorNode = GraphNode:new(f.."C ") -- 1C is the 1st floor corridor for instance
+        nextCorridorNode.isCorridor = true
+        nextCorridorNode.location.floor = f
+        corridorNodes[f] = nextCorridorNode
+    end
+
+    -- link rooms of a floor to its corridor
+    local roomNodePerFloors = {}
+    for z = 1, #roomLists do
+        local floorRoomList = roomLists[z]
+        local floorCorridor = corridorNodes[z]
+
+        roomNodePerFloor = {}
+
+        for r = 1, #floorRoomList do
+            local roomNode = GraphNode:new(z.."R"..r) -- 1R2 is the 1st floor Room 2 for instance
+            roomNode.location.floor = z
+            roomNode.location.roomIndex = r
+            roomNode:connect(floorCorridor)
+            floorCorridor:connect(roomNode)
+
+            roomNodePerFloor[#roomNodePerFloor + 1] = roomNode
+            -- debug only
+            floorRoomList[r].name = roomNode.name
+        end
+
+        roomNodePerFloors[z] = roomNodePerFloor
+    end
+
+    -- link adjacent rooms on same floor
+    for z = 1, #roomLists do
+        local floorRoomList = roomLists[z]
+        local roomNodeList = roomNodePerFloors[z]
+
+        for i = 1, #floorRoomList - 1 do
+            local currentRoom = floorRoomList[i]
+            local currentRoomNode = roomNodeList[i]
+            local widerRoomArea = RectangleRoom:new(currentRoom.x - 1, currentRoom.y, currentRoom.w + 2, currentRoom.h)
+            local tallerRoomArea = RectangleRoom:new(currentRoom.x, currentRoom.y - 1, currentRoom.w, currentRoom.h + 2)
+
+            for j = i + 1, #floorRoomList do
+                local nextRoom = floorRoomList[j]
+                if (nextRoom:getOverlappingAreaWith(widerRoomArea).area > 0) then
+                    local nextRoomNode = roomNodeList[j]
+                    nextRoomNode:connect(currentRoomNode)
+                    currentRoomNode:connect(nextRoomNode)
+                elseif (nextRoom:getOverlappingAreaWith(tallerRoomArea).area > 0) then
+                    local nextRoomNode = roomNodeList[j]
+                    nextRoomNode:connect(currentRoomNode)
+                    currentRoomNode:connect(nextRoomNode)
+                end
+            end
+        end
+    end
+
+    -- link rooms from different floors that are on top of each others
+    for z = 1, #roomLists - 1 do
+        local currentFloorRooms = roomLists[z]
+        local nextFloorRooms = roomLists[z + 1]
+
+        local currentFloorRoomNodes = roomNodePerFloors[z]
+        local nextFloorRoomNodes = roomNodePerFloors[z + 1]
+
+        for i = 1, #currentFloorRooms do
+            local currentFloorRoom = currentFloorRooms[i]
+
+            if not currentFloorRoom:isCorridorRoom() then
+                for j = 1, #nextFloorRooms do
+                    local nextFloorRoom = nextFloorRooms[j]
+
+                    if not nextFloorRoom:isCorridorRoom() then
+                        local overlappingArea = currentFloorRoom:getOverlappingAreaWith(nextFloorRoom)
+                        if overlappingArea.area > MINIMUM_OVERLAPPING_AREA then
+                            local currentFloorRoomNode = currentFloorRoomNodes[i]
+                            local nextFloorRoomNode = nextFloorRoomNodes[j]
+                            currentFloorRoomNode:connect(nextFloorRoomNode)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- debugArrayGraph(corridorNodes)
+
+    return {
+        rootNode = corridorNodes[1],
+        corridorNodes = corridorNodes,
+        roomNodePerFloors = roomNodePerFloors,
+    }
 end
 
 function Generator:_physicallyConnectRoomsFollowingGraphPath(roomLists, connectionList)
@@ -316,6 +439,37 @@ end
 
 function Generator:_makePathForPlayer(playerRoomGraph)
     local nodeStack = {playerRoomGraph}
+    local nodeStackIndex = 1
+
+    local connectionList = {}
+
+    while nodeStackIndex > 0 do
+        local currentNode = nodeStack[nodeStackIndex]
+        local possiblePath = self:_getPossiblePath(currentNode.linkedTo)
+
+        currentNode.browsed = true
+
+        if #possiblePath > 0 then
+            local pickedPathIndex = self.prng(1, #possiblePath)
+            local nextNode = possiblePath[pickedPathIndex]
+
+            currentNode.pathTo[#currentNode.pathTo + 1] = nextNode
+            nextNode.pathTo[#nextNode.pathTo + 1] = currentNode
+            connectionList[#connectionList + 1] = {currentNode, nextNode}
+            currentNode = nextNode
+
+            nodeStackIndex = nodeStackIndex + 1
+            nodeStack[nodeStackIndex] = currentNode
+        else
+            nodeStackIndex = nodeStackIndex - 1
+        end
+    end
+
+    return connectionList
+end
+
+function Generator:_makePathForBall(ballGraph)
+    local nodeStack = {ballGraph}
     local nodeStackIndex = 1
 
     local connectionList = {}
