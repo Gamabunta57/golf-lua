@@ -42,39 +42,231 @@ function Generator:generateMap(fusionLevel)
         self:_setWalls()
 
         local roomGraphDetailsForPlayer = self:_getRoomGraphForPlayer(roomLists)
-        local graphConnectionlist = self:_makePathForPlayer(roomGraphDetailsForPlayer.rootNode)
-        self:_physicallyConnectRoomsFollowingGraphPath(roomLists, graphConnectionlist)
+        local playerGraphConnectionlist = self:_makePathForPlayer(roomGraphDetailsForPlayer.rootNode)
+        self:_physicallyConnectRoomsFollowingGraphPath(roomLists, playerGraphConnectionlist)
         self:_physicallyConnectClosedRoomsWithCorridors(roomLists, roomGraphDetailsForPlayer)
 
         local graphDetailsForBall = self:_getGraphForBall(roomLists)
         local ballGraphConnectionlist = self:_makePathForBall(graphDetailsForBall.rootNode)
-        self:_physicallyConnectRoomsForBallPath(roomLists, ballGraphConnectionlist)
+        self:_physicallyConnectRoomsForBallPath(roomLists, ballGraphConnectionlist, playerGraphConnectionlist)
         
+        self:_setPlayerStartPosition(roomLists[1])
+        self:_setBallStartPosition(roomLists[1])
+        self:_setBallEndPosition(roomLists[#roomLists])
     end
     self.map.roomLists = roomLists
-
     -- debug(roomLists)
 end
 
-function Generator:_physicallyConnectRoomsForBallPath(roomLists, connectionList)
+function Generator:_setPlayerStartPosition()
+    local width = self.map.width
+    local height = self.map.height
+    local floorCells = self.map.floorCells[1]
+    
+    local positionFound = false
+    while not positionFound do
+        local x = self.prng(2, width - 1)
+        local y = self.prng(2, height - 1)
+
+        local index = x + (y - 1) * width
+        local cell = floorCells[index]
+
+        if (cell.tileRef == Cell.ROOM and cell.openings == Cell.NO_OPENINGS) then
+            positionFound = true
+            self.map.playerStartPosition = {x, y}
+        end
+    end
+end
+
+function Generator:_setBallStartPosition()
+    local width = self.map.width
+    local height = self.map.height
+    local floorCells = self.map.floorCells[1]
+    
+    local positionFound = false
+    while not positionFound do
+        local x = self.prng(2, width - 1)
+        local y = self.prng(2, height - 1)
+
+        local index = x + (y - 1) * width
+        local isPlayerStartingIndex = self.map.playerStartIndex == index
+
+        if not isPlayerStartingIndex then
+            local cell = floorCells[index]
+
+            if (cell.tileRef == Cell.ROOM and cell.openings == Cell.NO_OPENINGS) then
+                positionFound = true
+                self.map.ballStartPosition = {x, y}
+            end
+        end
+    end
+end
+
+function Generator:_setBallEndPosition()
+    local width = self.map.width
+    local height = self.map.height
+    local floorCells = self.map.floorCells[self.map.depth]
+    
+    local positionFound = false
+    while not positionFound do
+        local x = self.prng(2, width - 1)
+        local y = self.prng(2, height - 1)
+
+        local index = x + (y - 1) * width
+        local cell = floorCells[index]
+
+        if (cell.tileRef == Cell.ROOM and cell.openings == Cell.NO_OPENINGS) then
+            positionFound = true
+            self.map.ballEndPosition = {x, y}
+        end
+    end
+end
+
+function Generator:_physicallyConnectRoomsForBallPath(roomLists, connectionList, playerGraphConnectionlist)
     for i = 1, #connectionList do
         local connection = connectionList[i]
         local nodeA = connection[1]
         local nodeB = connection[2]
 
-        -- if nodeA.isCorridor and not nodeB.isCorridor then
-        --     self:_connectRoomToCorridor(nodeA, nodeB, roomLists)
-        -- elseif nodeB.isCorridor and not nodeA.isCorridor then
-        --     self:_connectRoomToCorridor(nodeB, nodeA, roomLists)
-        -- elseif not nodeB.isCorridor and not nodeA.isCorridor and nodeB.location.floor == nodeA.location.floor then
-        --     self:_connectRoomsOnSameFloors(nodeA, nodeB, roomLists)
-        -- elseif not nodeB.isCorridor and not nodeA.isCorridor then
-        --     self:_connectRoomsOnDifferentFloors(nodeA, nodeB, roomLists)
-        -- -- else
-        --     -- print("skip corridor connections")
-        -- end
+        local connectionAlreadyExists = nodeA.location.floor == nodeB.location.floor and self._isConnectionAlreadyExisting(connection, playerGraphConnectionlist)
 
-        print(nodeA.name, "=>", nodeB.name)
+        if not connectionAlreadyExists then
+            if nodeA.isCorridor then -- 1 corridor can only be connected to 1 room on the same floor
+                self:_connectRoomToCorridorForBall(nodeA, nodeB, roomLists)
+            elseif nodeB.isCorridor then 
+                self:_connectRoomToCorridorForBall(nodeB, nodeA, roomLists)
+            elseif nodeA.location.floor == nodeB.location.floor then  -- 2 rooms on the same floor
+                self:_connectRoomToRoomForBall(nodeA, nodeB, roomLists)
+            else -- 2 rooms on different floors
+                self:_pokeAHoleForTheBall(nodeA, nodeB, roomLists)
+            end
+        end
+    end
+end
+
+function Generator._isConnectionAlreadyExisting(currentConnection, connectionList)
+    local nodeA = currentConnection[1]
+    local nodeB = currentConnection[2]
+
+    for i = #connectionList, 1, -1 do
+        local otherA = connectionList[i][1]
+        local otherB = connectionList[i][2]
+
+        if (otherA.name == nodeA.name and otherB.name == nodeB.name) or (otherA.name == nodeB.name and otherB.name == nodeA.name) then
+            return true
+        end
+    end
+
+    return false
+end
+
+function Generator:_connectRoomToCorridorForBall(corridorNode, roomNode, roomLists)
+    local width = self.map.width
+    local roomLocation = roomNode.location
+    local roomToConnect = roomLists[roomLocation.floor][roomLocation.roomIndex]
+    local floorCells = self.map.floorCells[roomLocation.floor]
+    
+    local connectedCorridorCellIndicies = self:_findSurroundingCorridorCells(floorCells, roomToConnect)
+
+    if #connectedCorridorCellIndicies == 0 then
+        local additionnalAreaRoomIndex = 0
+        while #connectedCorridorCellIndicies == 0 and additionnalAreaRoomIndex < #roomToConnect.additionalAreaRooms do
+            additionnalAreaRoomIndex = additionnalAreaRoomIndex + 1
+            local additionalAreaRoom = roomToConnect.additionalAreaRooms[additionnalAreaRoomIndex]
+            connectedCorridorCellIndicies = self:_findSurroundingCorridorCells(floorCells, additionalAreaRoom)
+        end
+    end
+
+    local indicesCount = #connectedCorridorCellIndicies
+    if indicesCount > 0 then
+        -- pick a random cell to open and open it
+        local connectionIndex = self.prng(1, #connectedCorridorCellIndicies)
+        local corridorCellToOpenTo = connectedCorridorCellIndicies[connectionIndex]
+        local corridorCellIndex = corridorCellToOpenTo[1]
+        local directionToOpen = corridorCellToOpenTo[2]
+
+        local cell = nil
+        if (directionToOpen == Anchors.TO_TOP) then
+            cell = floorCells[corridorCellIndex - width]
+            cell.openings = Cell.BALL_OPENED_BOTTOM
+        elseif (directionToOpen == Anchors.TO_RIGHT) then
+            cell = floorCells[corridorCellIndex]
+            cell.openings = Cell.BALL_OPENED_RIGHT
+        elseif (directionToOpen == Anchors.TO_BOTTOM) then
+            cell = floorCells[corridorCellIndex]
+            cell.openings = Cell.BALL_OPENED_BOTTOM
+        elseif (directionToOpen == Anchors.TO_LEFT) then
+            cell = floorCells[corridorCellIndex - 1]
+            cell.openings = Cell.BALL_OPENED_RIGHT
+        end
+    else
+        print("Did not connect ball path between corridor and", roomNode.name)
+        -- i.e. a corridor has only 1 cell in contact and a closed door is already present
+    end
+end
+
+function Generator:_connectRoomToRoomForBall(roomNodeA, roomNodeB, roomLists)
+    local width = self.map.width
+    local roomLocation = roomNodeA.location
+    local roomA = roomLists[roomNodeA.location.floor][roomNodeA.location.roomIndex]
+    local roomB = roomLists[roomNodeB.location.floor][roomNodeB.location.roomIndex]
+    local floorCells = self.map.floorCells[roomNodeA.location.floor]
+    
+    local connectedWallCellIndicies = self:_findConnectedWallCells(floorCells, roomA, roomB.roomIndex)
+
+    -- pick a random cell to open and open it
+    local connectionIndex = self.prng(1, #connectedWallCellIndicies)
+    local wallCellToOpenTo = connectedWallCellIndicies[connectionIndex]
+    local wallCellIndex = wallCellToOpenTo[1]
+    local directionToOpen = wallCellToOpenTo[2]
+
+    local cell = nil
+    if (directionToOpen == Anchors.TO_TOP) then
+        cell = floorCells[wallCellIndex - width]
+        cell.openings = Cell.BALL_OPENED_BOTTOM
+    elseif (directionToOpen == Anchors.TO_RIGHT) then
+        cell = floorCells[wallCellIndex]
+        cell.openings = Cell.BALL_OPENED_RIGHT
+    elseif (directionToOpen == Anchors.TO_BOTTOM) then
+        cell = floorCells[wallCellIndex]
+        cell.openings = Cell.BALL_OPENED_BOTTOM
+    elseif (directionToOpen == Anchors.TO_LEFT) then
+        cell = floorCells[wallCellIndex - 1]
+        cell.openings = Cell.BALL_OPENED_RIGHT
+    end
+end
+
+function Generator:_pokeAHoleForTheBall(nodeA, nodeB, roomLists)
+    local topRoomLocation = (nodeA.location.floor < nodeB.location.floor and nodeA.location) or nodeB.location
+    local bottomRoomLocation = (nodeA.location.floor < nodeB.location.floor and nodeB.location) or nodeA.location
+
+    local topRoom = roomLists[topRoomLocation.floor][topRoomLocation.roomIndex]
+    local bottomRoom = roomLists[bottomRoomLocation.floor][bottomRoomLocation.roomIndex]
+
+    local overlappingArea = topRoom:getOverlappingAreaWith(bottomRoom)
+
+    local holeLocationFound = false
+    local attempts = 5
+
+    while not holeLocationFound and attempts > 0 do
+        local randX = self.prng(0, overlappingArea.w - 1)
+        local randY = self.prng(0, overlappingArea.h - 1)
+
+        local floorIndex = (overlappingArea.x + randX) + (overlappingArea.y - 1 + randY) * self.map.width
+
+        local cellRoomTop = self.map.floorCells[topRoomLocation.floor][floorIndex]
+        local cellRoomBottom = self.map.floorCells[bottomRoomLocation.floor][floorIndex]
+
+        if (cellRoomTop.openings == Cell.NO_OPENINGS) then
+            cellRoomTop.openings = Cell.BALL_HOLE
+            holeLocationFound = true
+        else
+            attempts = attempts - 1
+        end
+
+        if not holeLocationFound and attempts < 1 then
+            print("[DEBUG]: can't poke a hole", topRoom.name, bottomRoom.name, overlappingArea.x, overlappingArea.y, overlappingArea.w, overlappingArea.h, floorIndex, cellRoomTop.tileRef, cellRoomBottom.tileRef)
+        end
     end
 end
 
@@ -221,25 +413,31 @@ function Generator:_connectClosedRoomToCorridor(corridorNode, roomNode, roomList
         end
     end
 
-    -- pick a random cell to open and open it
-    local connectionIndex = self.prng(1, #connectedCorridorCellIndicies)
-    local corridorCellToOpenTo = connectedCorridorCellIndicies[connectionIndex]
-    local corridorCellIndex = corridorCellToOpenTo[1]
-    local directionToOpen = corridorCellToOpenTo[2]
+    local indicesCount = #connectedCorridorCellIndicies
+    if (indicesCount > 0) then
+        -- pick a random cell to open and open it
+        local connectionIndex = self.prng(1, indicesCount)
+        local corridorCellToOpenTo = connectedCorridorCellIndicies[connectionIndex]
+        local corridorCellIndex = corridorCellToOpenTo[1]
+        local directionToOpen = corridorCellToOpenTo[2]
 
-    local cell = nil
-    if (directionToOpen == Anchors.TO_TOP) then
-        cell = floorCells[corridorCellIndex - width]
-        cell.openings = Cell.CLOSED_BOTTOM
-    elseif (directionToOpen == Anchors.TO_RIGHT) then
-        cell = floorCells[corridorCellIndex]
-        cell.openings = Cell.CLOSED_RIGHT
-    elseif (directionToOpen == Anchors.TO_BOTTOM) then
-        cell = floorCells[corridorCellIndex]
-        cell.openings = Cell.CLOSED_BOTTOM
-    elseif (directionToOpen == Anchors.TO_LEFT) then
-        cell = floorCells[corridorCellIndex - 1]
-        cell.openings = Cell.CLOSED_RIGHT
+        local cell = nil
+        if (directionToOpen == Anchors.TO_TOP) then
+            cell = floorCells[corridorCellIndex - width]
+            cell.openings = Cell.CLOSED_BOTTOM
+        elseif (directionToOpen == Anchors.TO_RIGHT) then
+            cell = floorCells[corridorCellIndex]
+            cell.openings = Cell.CLOSED_RIGHT
+        elseif (directionToOpen == Anchors.TO_BOTTOM) then
+            cell = floorCells[corridorCellIndex]
+            cell.openings = Cell.CLOSED_BOTTOM
+        elseif (directionToOpen == Anchors.TO_LEFT) then
+            cell = floorCells[corridorCellIndex - 1]
+            cell.openings = Cell.CLOSED_RIGHT
+        end
+    else
+        print("Did not connect closed door between corridor and", roomNode.name)
+        -- i.e. a corridor has only 1 cell in contact contains a door for another room
     end
 end
 
@@ -328,10 +526,10 @@ function Generator:_findConnectedWallCells(floorCells, roomA, roomBIndex)
             local topCell = floorCells[topFloorCellIndex]
             local bottomCell = floorCells[bottomFloorCellIndex]
 
-            if (topCell.roomIndex == roomBIndex) then
+            if (topCell.roomIndex == roomBIndex and topCell.openings == Cell.NO_OPENINGS) then
                 connectedWallCellIndicies[#connectedWallCellIndicies + 1] = {topFloorCellIndex, Anchors.TO_BOTTOM}
             end
-            if (bottomCell.roomIndex == roomBIndex) then
+            if (bottomCell.roomIndex == roomBIndex and bottomCell.openings == Cell.NO_OPENINGS) then
                 connectedWallCellIndicies[#connectedWallCellIndicies + 1] = {bottomFloorCellIndex, Anchors.TO_TOP}
             end
         end
@@ -345,10 +543,10 @@ function Generator:_findConnectedWallCells(floorCells, roomA, roomBIndex)
             local leftCell = floorCells[leftFloorCellIndex]
             local rightCell = floorCells[rightFloorCellIndex]
 
-            if (leftCell.roomIndex == roomBIndex) then
+            if (leftCell.roomIndex == roomBIndex and leftCell.openings == Cell.NO_OPENINGS) then
                 connectedWallCellIndicies[#connectedWallCellIndicies + 1] = {leftFloorCellIndex, Anchors.TO_RIGHT}
             end
-            if (rightCell.roomIndex == roomBIndex) then
+            if (rightCell.roomIndex == roomBIndex and rightCell.openings == Cell.NO_OPENINGS) then
                 connectedWallCellIndicies[#connectedWallCellIndicies + 1] = {rightFloorCellIndex, Anchors.TO_LEFT}
             end
         end
@@ -405,14 +603,18 @@ function Generator:_findSurroundingCorridorCells(floorCells, roomToConnect)
     for i = 0, roomToConnect.w - 1 do
         local topFloorCellIndex = origX + i + (roomToConnect.y - 2) * width
         local bottomFloorCellIndex = topFloorCellIndex + (roomToConnect.h + 1) * width
+        local topInnerCellIndex = origX + i + (roomToConnect.y - 1) * width
+        local bottomInnerCellIndex = topFloorCellIndex + roomToConnect.h * width
         
         local topCell = floorCells[topFloorCellIndex]
         local bottomCell = floorCells[bottomFloorCellIndex]
+        local topInnerCell = floorCells[topInnerCellIndex]
+        local bottomInnerCell = floorCells[bottomInnerCellIndex]
 
-        if (topCell.tileRef == Cell.CORRIDOR) then
+        if (topCell.tileRef == Cell.CORRIDOR and topCell.openings == Cell.NO_OPENINGS and topInnerCell.openings == Cell.NO_OPENINGS) then
             connectedCorridorCellIndicies[#connectedCorridorCellIndicies + 1] = {topFloorCellIndex, Anchors.TO_BOTTOM}
         end
-        if (bottomCell.tileRef == Cell.CORRIDOR) then
+        if (bottomCell.tileRef == Cell.CORRIDOR and bottomCell.openings == Cell.NO_OPENINGS and bottomInnerCell.openings == Cell.NO_OPENINGS) then
             connectedCorridorCellIndicies[#connectedCorridorCellIndicies + 1] = {bottomFloorCellIndex, Anchors.TO_TOP}
         end
     end
@@ -422,14 +624,18 @@ function Generator:_findSurroundingCorridorCells(floorCells, roomToConnect)
     for i = 0, roomToConnect.h - 1 do
         local leftFloorCellIndex = (origY + i - 1) * width + (roomToConnect.x - 1)
         local rightFloorCellIndex = leftFloorCellIndex + roomToConnect.w + 1
+        local leftInnerCellIndex = (origY + i - 1) * width + roomToConnect.x
+        local rightInnerCellIndex = leftFloorCellIndex + roomToConnect.w
         
         local leftCell = floorCells[leftFloorCellIndex]
         local rightCell = floorCells[rightFloorCellIndex]
+        local leftInnerCell = floorCells[leftInnerCellIndex]
+        local rightInnerCell = floorCells[rightInnerCellIndex]
 
-        if (leftCell.tileRef == Cell.CORRIDOR) then
+        if (leftCell.tileRef == Cell.CORRIDOR and leftCell.openings == Cell.NO_OPENINGS and leftInnerCell.openings == Cell.NO_OPENINGS) then
             connectedCorridorCellIndicies[#connectedCorridorCellIndicies + 1] = {leftFloorCellIndex, Anchors.TO_RIGHT}
         end
-        if (rightCell.tileRef == Cell.CORRIDOR) then
+        if (rightCell.tileRef == Cell.CORRIDOR and rightCell.openings == Cell.NO_OPENINGS and rightInnerCell.openings == Cell.NO_OPENINGS) then
             connectedCorridorCellIndicies[#connectedCorridorCellIndicies + 1] = {rightFloorCellIndex, Anchors.TO_LEFT}
         end
     end

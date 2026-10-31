@@ -15,6 +15,9 @@ Cell = {
     STAIRCASE_DOWN = 4,
     CLOSED_BOTTOM = 5,
     CLOSED_RIGHT = 6,
+    BALL_OPENED_BOTTOM = 7,
+    BALL_OPENED_RIGHT = 8,
+    BALL_HOLE = 9
 }
 
 Cell.__index = Cell

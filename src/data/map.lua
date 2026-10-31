@@ -10,6 +10,9 @@ function Map:new(width, height, depth)
         depth = depth or 1,
         floorCells = {},
         floorRooms = {},
+        playerStartPosition = {},
+        ballStartPosition = {},
+        ballEndPosition = {},
     }
 
     setmetatable(o, self)

@@ -18,8 +18,8 @@ local colors = {
     {0, 0, 0, 1}, -- Cell.LIMIT
     {1, 0, 1, 1}, -- Cell.UNDEFINED
     {1, .5, .25, 1}, -- Cell.ELEVATOR
-    {1, 1, 1, .75}, -- Cell.CORRIDOR
-    {1, 1, 1, .25}, -- Cell.ROOM
+    {1, 1, 1, 1}, -- Cell.CORRIDOR
+    {.3, .3, .3, 1}, -- Cell.ROOM
     {.5, .75, .25, 1}, -- Cell.hasAnchor // 1
     {.25, 1, .15, 1}, -- Cell.hasAnchor // 2
     {.15, 1, 1, 1}, -- Cell.hasAnchor // 3
@@ -64,7 +64,7 @@ local wasFPressed = false
 local wasDPressed = false
 
 function regenerateMap()
-    map = Map:new(12, 12, 6)
+    map = Map:new(14, 14, 12)
     love.math.setRandomSeed(seed)
     generator = Generator:new(map, prng)
     generator:generateMap(fusionLevel)
@@ -74,7 +74,7 @@ function love.load()
     love.graphics.setBackgroundColor(.1, .1, .1, 1)
     tileSet = love.graphics.newImage("assets/images/tileset.png")
     local tileSize = 16
-    for i = 0, 9 do
+    for i = 0, 16 do
         quads[i + 1] = love.graphics.newQuad(i * tileSize, 0, CELL_SIZE, CELL_SIZE, tileSet)
     end
 
@@ -160,6 +160,23 @@ function love.draw()
             currentOriginY = origY
         end
     end
+
+
+    love.graphics.setColor({1, 1, 1, 1})
+    -- displayPlayerStart
+    local xOffset = (map.playerStartPosition[1] - 1) * CELL_SIZE
+    local yOffset = (map.playerStartPosition[2] - 1) * CELL_SIZE
+    love.graphics.draw(tileSet, quads[16], origX + xOffset, origY + yOffset)
+
+    -- displayBallStart
+    xOffset = (map.ballStartPosition[1] - 1) * CELL_SIZE
+    yOffset = (map.ballStartPosition[2] - 1) * CELL_SIZE
+    love.graphics.draw(tileSet, quads[14], origX + xOffset, origY + yOffset)
+
+    -- displayBallEnd
+    xOffset = (map.ballEndPosition[1] - 1) * CELL_SIZE
+    yOffset = (map.ballEndPosition[2] - 1) * CELL_SIZE
+    love.graphics.draw(tileSet, quads[15], currentOriginX + xOffset - floorWidthPx, currentOriginY + yOffset + floorHeightPx)
 
     -- draw quick UI
     local strings = {
